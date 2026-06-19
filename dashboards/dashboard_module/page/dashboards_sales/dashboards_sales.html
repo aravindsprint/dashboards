@@ -1,0 +1,292 @@
+<link rel="stylesheet" href="/assets/dashboards/css/sales_dashboard.css" />
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+<div id="sales-dashboard-app">
+
+  <!-- ── Header ── -->
+  <div class="sd-header">
+    <div class="sd-header__left">
+      <a href="/app/dashboards" class="sd-back" title="All Dashboards">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+        <rect width="28" height="28" rx="6" fill="#1565C0"/>
+        <path d="M6 20 L10 13 L14 16 L18 8 L22 12" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <div class="sd-title-group">
+        <span class="sd-breadcrumb"><a href="/app/dashboards">Dashboards</a> /</span>
+        <span class="sd-title">Sales Dashboard</span>
+      </div>
+    </div>
+    <div class="sd-header__right">
+      <div class="sd-fg"><label class="sd-lbl">From</label><input type="date" v-model="filters.from_date" class="sd-input" @change="loadAll"/></div>
+      <div class="sd-fg"><label class="sd-lbl">To</label><input type="date" v-model="filters.to_date" class="sd-input" @change="loadAll"/></div>
+      <div class="sd-fg"><label class="sd-lbl">Company</label>
+        <select v-model="filters.company" class="sd-select" @change="loadAll">
+          <option value="">All companies</option>
+          <option v-for="c in companies" :key="c" :value="c">{{ c }}</option>
+        </select>
+      </div>
+      <div class="sd-ranges">
+        <button v-for="r in quickRanges" :key="r.label" :class="['sd-range',{active:activeRange===r.label}]" @click="applyRange(r)">{{ r.label }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- loading -->
+  <div v-if="loading" class="sd-loading"><div class="sd-spinner"></div><span>Loading…</span></div>
+
+  <template v-else>
+    <!-- ── Tabs ── -->
+    <div class="sd-tabs">
+      <button v-for="t in tabs" :key="t.key" :class="['sd-tab',{active:activeTab===t.key}]" @click="activeTab=t.key">
+        <span class="sd-tab-icon">{{ t.icon }}</span>{{ t.label }}
+      </button>
+    </div>
+
+    <!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+    <div v-show="activeTab==='overview'" class="sd-body">
+      <div class="sd-slbl">Sales Invoices</div>
+      <div class="sd-kpis">
+        <div class="sd-kpi"><div class="sd-kpi-l">Total Invoiced</div><div class="sd-kpi-v">{{ fmt(summary.invoice.total_invoiced) }}</div><div class="sd-kpi-s">{{ summary.invoice.count }} invoices</div></div>
+        <div class="sd-kpi g"><div class="sd-kpi-l">Collected</div><div class="sd-kpi-v">{{ fmt(summary.invoice.total_collected) }}</div><div class="sd-kpi-s">{{ summary.invoice.collection_rate }}% rate</div></div>
+        <div class="sd-kpi a"><div class="sd-kpi-l">Outstanding</div><div class="sd-kpi-v">{{ fmt(summary.invoice.total_outstanding) }}</div><div class="sd-kpi-s">Pending collection</div></div>
+        <div class="sd-kpi"><div class="sd-kpi-l">Collection Rate</div><div class="sd-kpi-v">{{ summary.invoice.collection_rate }}%</div>
+          <div class="sd-kpi-s"><div class="sd-prog"><div class="sd-progb" :class="summary.invoice.collection_rate>=80?'g':'a'" :style="{width:summary.invoice.collection_rate+'%'}"></div></div></div>
+        </div>
+      </div>
+      <div class="sd-slbl mt">Sales Orders</div>
+      <div class="sd-kpis">
+        <div class="sd-kpi"><div class="sd-kpi-l">Total Ordered</div><div class="sd-kpi-v">{{ fmt(summary.order.total_ordered) }}</div><div class="sd-kpi-s">{{ summary.order.count }} orders</div></div>
+        <div class="sd-kpi t"><div class="sd-kpi-l">To Deliver</div><div class="sd-kpi-v">{{ (summary.order.delivery_breakdown['Not Delivered']||0)+(summary.order.delivery_breakdown['Partly Delivered']||0) }}</div><div class="sd-kpi-s">orders pending</div></div>
+        <div class="sd-kpi g"><div class="sd-kpi-l">Fully Delivered</div><div class="sd-kpi-v">{{ summary.order.delivery_breakdown['Fully Delivered']||0 }}</div><div class="sd-kpi-s">completed</div></div>
+        <div class="sd-kpi"><div class="sd-kpi-l">Completed Orders</div><div class="sd-kpi-v">{{ summary.order.status_breakdown['Completed']||0 }}</div><div class="sd-kpi-s">billed & delivered</div></div>
+      </div>
+      <div class="sd-chart-row">
+        <div class="sd-card wide">
+          <div class="sd-ch"><span class="sd-ct">Monthly Revenue Trend</span>
+            <div class="sd-leg"><span class="sd-dot" style="background:#1565C0"></span>Invoices <span class="sd-dot" style="background:#0097A7;margin-left:10px"></span>Orders</div>
+          </div>
+          <div style="position:relative;height:220px"><canvas id="trendChart" role="img" aria-label="Monthly revenue trend"></canvas></div>
+        </div>
+        <div class="sd-card">
+          <div class="sd-ch"><span class="sd-ct">Invoice Status</span></div>
+          <div style="position:relative;height:160px"><canvas id="invoiceStatusChart" role="img" aria-label="Invoice status"></canvas></div>
+          <div class="sd-leg-list">
+            <div v-for="(v,k) in summary.invoice.status_breakdown" :key="k" class="sd-li">
+              <span class="sd-dot" :style="{background:siColor(k)}"></span><span class="sd-li-k">{{ k }}</span><span class="sd-li-v">{{ v }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="sd-card">
+          <div class="sd-ch"><span class="sd-ct">Delivery Status</span></div>
+          <div style="position:relative;height:160px"><canvas id="deliveryStatusChart" role="img" aria-label="Delivery status"></canvas></div>
+          <div class="sd-leg-list">
+            <div v-for="(v,k) in summary.order.delivery_breakdown" :key="k" class="sd-li">
+              <span class="sd-dot" :style="{background:delColor(k)}"></span><span class="sd-li-k">{{ k }}</span><span class="sd-li-v">{{ v }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ SALES INVOICES ═══════════════════════ -->
+    <div v-show="activeTab==='invoices'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full">
+          <div class="sd-ch"><span class="sd-ct">Top Customers — Revenue</span></div>
+          <div :style="{position:'relative',height:Math.max(220,topCustomers.by_invoice.length*34+60)+'px'}"><canvas id="topCustSIChart" role="img" aria-label="Top customers by invoice revenue"></canvas></div>
+        </div>
+        <div class="sd-card full">
+          <div class="sd-ch"><span class="sd-ct">Invoice Status Breakdown</span></div>
+          <div class="sd-sbars">
+            <div v-for="(v,k) in summary.invoice.status_breakdown" :key="k" class="sd-srow">
+              <span class="sd-sbadge" :style="{background:siColor(k)+'22',color:siColor(k)}">{{ k }}</span>
+              <div class="sd-sbw"><div class="sd-sbar" :style="{width:pct(v,summary.invoice.count)+'%',background:siColor(k)}"></div></div>
+              <span class="sd-scnt">{{ v }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ SALES ORDERS ═══════════════════════ -->
+    <div v-show="activeTab==='orders'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full">
+          <div class="sd-ch"><span class="sd-ct">Top Customers — Order Value</span></div>
+          <div :style="{position:'relative',height:Math.max(220,topCustomers.by_order.length*34+60)+'px'}"><canvas id="topCustSOChart" role="img" aria-label="Top customers by order value"></canvas></div>
+        </div>
+        <div class="sd-card full">
+          <div class="sd-ch"><span class="sd-ct">Order Status Breakdown</span></div>
+          <div class="sd-sbars">
+            <div v-for="(v,k) in summary.order.status_breakdown" :key="k" class="sd-srow">
+              <span class="sd-sbadge" :style="{background:soColor(k)+'22',color:soColor(k)}">{{ k }}</span>
+              <div class="sd-sbw"><div class="sd-sbar" :style="{width:pct(v,summary.order.count)+'%',background:soColor(k)}"></div></div>
+              <span class="sd-scnt">{{ v }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ COMMERCIAL NAME ═══════════════════════ -->
+    <div v-show="activeTab==='commercial_name'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by Commercial Name</span><span class="sd-badge inv">Invoices</span></div><div :style="{position:'relative',height:Math.max(240,commercialName.by_invoice.length*36+60)+'px'}"><canvas id="cnSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by Commercial Name</span><span class="sd-badge ord">Orders</span></div><div :style="{position:'relative',height:Math.max(240,commercialName.by_order.length*36+60)+'px'}"><canvas id="cnSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Commercial Name Details</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>Commercial Name</th><th>Revenue (SI)</th><th>Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Qty (SO)</th></tr></thead>
+        <tbody>
+          <tr v-for="row in commercialName.by_invoice" :key="row.commercial_name">
+            <td><strong>{{ cleanName(row.commercial_name) }}</strong></td><td class="sd-amt">{{ fmt(row.revenue) }}</td><td>{{ fmtQty(row.qty) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).order_value) }}</td>
+            <td>{{ fmtQty((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).qty) }}</td>
+          </tr>
+          <tr v-if="!commercialName.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ UOM ═══════════════════════ -->
+    <div v-show="activeTab==='uom'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by UOM</span><span class="sd-badge inv">Invoices</span></div><div style="position:relative;height:260px"><canvas id="uomSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by UOM</span><span class="sd-badge ord">Orders</span></div><div style="position:relative;height:260px"><canvas id="uomSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">UOM Details</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>UOM</th><th>Revenue (SI)</th><th>Total Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Total Qty (SO)</th><th>Orders</th></tr></thead>
+        <tbody>
+          <tr v-for="row in uomData.by_invoice" :key="row.uom">
+            <td><strong>{{ row.uom||'—' }}</strong></td><td class="sd-amt">{{ fmt(row.revenue) }}</td><td>{{ fmtQty(row.total_qty) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((uomData.by_order.find(r=>r.uom===row.uom)||{}).order_value) }}</td>
+            <td>{{ fmtQty((uomData.by_order.find(r=>r.uom===row.uom)||{}).total_qty) }}</td>
+            <td>{{ (uomData.by_order.find(r=>r.uom===row.uom)||{}).orders||'—' }}</td>
+          </tr>
+          <tr v-if="!uomData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ STATE ═══════════════════════ -->
+    <div v-show="activeTab==='state'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by State</span><span class="sd-badge inv">Invoices</span></div><div :style="{position:'relative',height:Math.max(240,stateData.by_invoice.length*36+60)+'px'}"><canvas id="stateSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by State</span><span class="sd-badge ord">Orders</span></div><div :style="{position:'relative',height:Math.max(240,stateData.by_order.length*36+60)+'px'}"><canvas id="stateSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">State Details</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>State</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+        <tbody>
+          <tr v-for="row in stateData.by_invoice" :key="row.state">
+            <td><strong>{{ row.state||'—' }}</strong></td><td class="sd-amt">{{ fmt(row.revenue) }}</td><td class="sd-amt">{{ fmt(row.collected) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((stateData.by_order.find(r=>r.state===row.state)||{}).order_value) }}</td>
+            <td>{{ (stateData.by_order.find(r=>r.state===row.state)||{}).orders||'—' }}</td>
+          </tr>
+          <tr v-if="!stateData.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ SALES PERSON ═══════════════════════ -->
+    <div v-show="activeTab==='salesperson'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by Sales Person</span><span class="sd-badge inv">Invoices</span></div><div :style="{position:'relative',height:Math.max(240,spData.by_invoice.length*36+60)+'px'}"><canvas id="spSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by Sales Person</span><span class="sd-badge ord">Orders</span></div><div :style="{position:'relative',height:Math.max(240,spData.by_order.length*36+60)+'px'}"><canvas id="spSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Sales Person Performance</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>#</th><th>Sales Person</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+        <tbody>
+          <tr v-for="(row,i) in spData.by_invoice" :key="row.sales_person">
+            <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td><td><strong>{{ row.sales_person||'—' }}</strong></td>
+            <td class="sd-amt">{{ fmt(row.revenue) }}</td><td class="sd-amt">{{ fmt(row.collected) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).order_value) }}</td>
+            <td>{{ (spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).orders||'—' }}</td>
+          </tr>
+          <tr v-if="!spData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ COST CENTER ═══════════════════════ -->
+    <div v-show="activeTab==='cost_center'" class="sd-body">
+      <div class="sd-2col">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by Cost Center</span><span class="sd-badge inv">Invoices</span></div><div :style="{position:'relative',height:Math.max(240,ccData.by_invoice.length*36+60)+'px'}"><canvas id="ccSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by Cost Center</span><span class="sd-badge ord">Orders</span></div><div :style="{position:'relative',height:Math.max(240,ccData.by_order.length*36+60)+'px'}"><canvas id="ccSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Cost Center Details</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>#</th><th>Cost Center</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Collection %</th><th>Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+        <tbody>
+          <tr v-for="(row,i) in ccData.by_invoice" :key="row.cost_center">
+            <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td><td><strong>{{ row.cost_center }}</strong></td>
+            <td class="sd-amt">{{ fmt(row.revenue) }}</td><td class="sd-amt">{{ fmt(row.collected) }}</td>
+            <td><div style="display:flex;align-items:center;gap:6px"><div class="sd-sbw" style="width:60px"><div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div></div><span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span></div></td>
+            <td>{{ fmtQty(row.total_qty) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
+            <td>{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders||'—' }}</td>
+          </tr>
+          <tr v-if="!ccData.by_invoice.length"><td colspan="9" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ NAMING SERIES ═══════════════════════ -->
+    <div v-show="activeTab==='naming_series'" class="sd-body">
+      <div class="sd-info-bar">
+        <span>📋</span>
+        <span>Naming series encodes your <strong>branch / location / year</strong> — e.g. <code>PTGB26</code> = Pranera Tirupur Garments B2B FY2026.</span>
+      </div>
+      <div class="sd-2col" style="margin-top:14px">
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Revenue by Naming Series</span><span class="sd-badge inv">Invoices</span></div><div :style="{position:'relative',height:Math.max(280,nsData.by_invoice.length*34+60)+'px'}"><canvas id="nsSIChart"></canvas></div></div>
+        <div class="sd-card full"><div class="sd-ch"><span class="sd-ct">Order Value by Naming Series</span><span class="sd-badge ord">Orders</span></div><div :style="{position:'relative',height:Math.max(280,nsData.by_order.length*34+60)+'px'}"><canvas id="nsSOChart"></canvas></div></div>
+      </div>
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Naming Series Details</span></div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>#</th><th>Naming Series</th><th>Prefix</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+        <tbody>
+          <tr v-for="(row,i) in nsData.by_invoice" :key="row.naming_series">
+            <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+            <td><code style="font-size:11px;background:#F5F5F5;padding:2px 6px;border-radius:4px">{{ row.naming_series }}</code></td>
+            <td><span class="sd-pill" style="background:#E3F2FD;color:#1565C0">{{ row.series_prefix }}</span></td>
+            <td class="sd-amt">{{ fmt(row.revenue) }}</td><td class="sd-amt">{{ fmt(row.collected) }}</td><td>{{ row.invoices }}</td>
+            <td class="sd-amt">{{ fmt((nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).order_value) }}</td>
+            <td>{{ (nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).orders||'—' }}</td>
+          </tr>
+          <tr v-if="!nsData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+    <!-- ═══════════════════════ TRANSACTIONS ═══════════════════════ -->
+    <div v-show="activeTab==='transactions'" class="sd-body">
+      <div class="sd-card">
+        <div class="sd-ch">
+          <span class="sd-ct">Recent Transactions</span>
+          <input v-model="txSearch" class="sd-input" placeholder="Search customer or ID…" style="width:220px"/>
+        </div>
+        <div class="sd-twrap"><table class="sd-table"><thead><tr><th>ID</th><th>Type</th><th>Customer</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr v-for="tx in filteredTransactions" :key="tx.name">
+            <td><a :href="txLink(tx)" target="_blank" class="sd-link">{{ tx.name }}</a></td>
+            <td><span :class="['sd-tbadge',tx.type==='Invoice'?'inv':'ord']">{{ tx.type }}</span></td>
+            <td>{{ tx.customer }}</td><td>{{ fmtDate(tx.date) }}</td>
+            <td class="sd-amt">{{ fmt(tx.grand_total) }}</td>
+            <td><span class="sd-pill" :style="{background:(tx.type==='Invoice'?siColor(tx.status):soColor(tx.status))+'22',color:tx.type==='Invoice'?siColor(tx.status):soColor(tx.status)}">{{ tx.status }}</span></td>
+          </tr>
+          <tr v-if="!filteredTransactions.length"><td colspan="6" class="sd-empty">No transactions found.</td></tr>
+        </tbody></table></div>
+      </div>
+    </div>
+
+  </template>
+</div>
+
+<script src="/assets/dashboards/js/sales_dashboard.js"></script>

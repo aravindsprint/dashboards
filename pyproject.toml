@@ -1,0 +1,15 @@
+[build-system]
+requires = ["flit_core >=3.2.0,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "dashboards"
+version = "1.0.0"
+description = "Pranera ERP Dashboards"
+requires-python = ">=3.10"
+readme = "README.md"
+license = { text = "MIT" }
+dependencies = ["frappe"]
+
+[tool.flit.module]
+name = "dashboards"

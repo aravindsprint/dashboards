@@ -1,0 +1,28 @@
+{
+  "name": "Pranera Dashboards",
+  "short_name": "Dashboards",
+  "description": "Pranera ERP Dashboards — Sales, Purchase, Work Order and more",
+  "start_url": "/dashboards",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#F8FAFB",
+  "theme_color": "#1565C0",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='80' fill='%231565C0'/%3E%3Crect x='60' y='290' width='100' height='160' rx='12' fill='white'/%3E%3Crect x='206' y='180' width='100' height='270' rx='12' fill='white'/%3E%3Crect x='352' y='100' width='100' height='350' rx='12' fill='white'/%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "shortcuts": [
+    {
+      "name": "Sales Dashboard",
+      "short_name": "Sales",
+      "description": "Open Sales Dashboard",
+      "url": "/dashboards-sales",
+      "icons": [{ "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect width='96' height='96' rx='16' fill='%231565C0'/%3E%3Cpath d='M12 72 L24 50 L36 58 L52 32 L64 44 L80 24' stroke='white' stroke-width='6' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E", "sizes": "96x96" }]
+    }
+  ]
+}

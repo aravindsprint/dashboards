@@ -1,0 +1,499 @@
+import frappe
+from frappe import _
+from frappe.utils import nowdate, add_months, flt
+import json
+
+
+# ── shared helpers ────────────────────────────────────────────────────────────
+
+def _date_args(from_date, to_date):
+    if not from_date:
+        from_date = add_months(nowdate(), -1)
+    if not to_date:
+        to_date = nowdate()
+    return from_date, to_date
+
+
+def _cf(company):
+    return "AND si.company=%s" if company else ""
+
+
+# ── existing endpoints (unchanged) ───────────────────────────────────────────
+
+@frappe.whitelist()
+def get_dashboard_summary(from_date=None, to_date=None, company=None):
+    from_date, to_date = _date_args(from_date, to_date)
+    fb = {"docstatus": 1}
+    if company:
+        fb["company"] = company
+
+    si_data = frappe.db.get_list(
+        "Sales Invoice",
+        filters={**fb, "posting_date": ["between", [from_date, to_date]]},
+        fields=["grand_total", "outstanding_amount", "status", "name"],
+        limit=10000,
+    )
+    total_invoiced   = sum(flt(r["grand_total"]) for r in si_data)
+    total_outstanding = sum(flt(r["outstanding_amount"]) for r in si_data)
+    total_collected  = total_invoiced - total_outstanding
+    invoice_count    = len(si_data)
+    status_counts_si = {}
+    for r in si_data:
+        s = r.get("status", "Draft")
+        status_counts_si[s] = status_counts_si.get(s, 0) + 1
+
+    so_data = frappe.db.get_list(
+        "Sales Order",
+        filters={**fb, "transaction_date": ["between", [from_date, to_date]]},
+        fields=["grand_total", "advance_paid", "status", "delivery_status", "name"],
+        limit=10000,
+    )
+    total_ordered   = sum(flt(r["grand_total"]) for r in so_data)
+    order_count     = len(so_data)
+    status_counts_so = {}
+    delivery_counts  = {}
+    for r in so_data:
+        s = r.get("status", "Draft")
+        status_counts_so[s] = status_counts_so.get(s, 0) + 1
+        d = r.get("delivery_status", "Not Delivered")
+        delivery_counts[d] = delivery_counts.get(d, 0) + 1
+
+    collection_rate = round((total_collected / total_invoiced * 100), 2) if total_invoiced else 0
+
+    return {
+        "from_date": from_date, "to_date": to_date,
+        "invoice": {
+            "total_invoiced": total_invoiced,
+            "total_collected": total_collected,
+            "total_outstanding": total_outstanding,
+            "collection_rate": collection_rate,
+            "count": invoice_count,
+            "status_breakdown": status_counts_si,
+        },
+        "order": {
+            "total_ordered": total_ordered,
+            "count": order_count,
+            "status_breakdown": status_counts_so,
+            "delivery_breakdown": delivery_counts,
+        },
+    }
+
+
+@frappe.whitelist()
+def get_monthly_trend(months=6, company=None):
+    from_date = add_months(nowdate(), -int(months))
+    cf = "AND company=%s" if company else ""
+    p  = (from_date, company) if company else (from_date,)
+
+    si_rows = frappe.db.sql(
+        f"""SELECT DATE_FORMAT(posting_date,'%%Y-%%m') AS month,
+                   SUM(grand_total) AS total, COUNT(name) AS cnt
+            FROM `tabSales Invoice`
+            WHERE docstatus=1 AND posting_date>=%s {cf}
+            GROUP BY month ORDER BY month""",
+        p, as_dict=True,
+    )
+    so_rows = frappe.db.sql(
+        f"""SELECT DATE_FORMAT(transaction_date,'%%Y-%%m') AS month,
+                   SUM(grand_total) AS total, COUNT(name) AS cnt
+            FROM `tabSales Order`
+            WHERE docstatus=1 AND transaction_date>=%s {cf}
+            GROUP BY month ORDER BY month""",
+        p, as_dict=True,
+    )
+    return {"invoices": si_rows, "orders": so_rows}
+
+
+@frappe.whitelist()
+def get_top_customers(from_date=None, to_date=None, limit=10, company=None):
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = "AND company=%s" if company else ""
+    p_si = [from_date, to_date] + ([company] if company else [])
+    p_so = [from_date, to_date] + ([company] if company else [])
+
+    top_si = frappe.db.sql(
+        f"""SELECT customer, SUM(grand_total) AS revenue, COUNT(name) AS invoices
+            FROM `tabSales Invoice`
+            WHERE docstatus=1 AND posting_date BETWEEN %s AND %s {cf}
+            GROUP BY customer ORDER BY revenue DESC LIMIT {int(limit)}""",
+        p_si, as_dict=True,
+    )
+    top_so = frappe.db.sql(
+        f"""SELECT customer, SUM(grand_total) AS order_value, COUNT(name) AS orders
+            FROM `tabSales Order`
+            WHERE docstatus=1 AND transaction_date BETWEEN %s AND %s {cf}
+            GROUP BY customer ORDER BY order_value DESC LIMIT {int(limit)}""",
+        p_so, as_dict=True,
+    )
+    return {"by_invoice": top_si, "by_order": top_so}
+
+
+@frappe.whitelist()
+def get_recent_transactions(limit=20, company=None):
+    cf = {"company": company} if company else {}
+
+    si = frappe.db.get_list(
+        "Sales Invoice",
+        filters={"docstatus": 1, **cf},
+        fields=["name", "customer", "posting_date as date", "grand_total", "outstanding_amount", "status"],
+        order_by="posting_date desc", limit=int(limit),
+    )
+    for r in si: r["type"] = "Invoice"
+
+    so = frappe.db.get_list(
+        "Sales Order",
+        filters={"docstatus": 1, **cf},
+        fields=["name", "customer", "transaction_date as date", "grand_total", "delivery_status", "status"],
+        order_by="transaction_date desc", limit=int(limit),
+    )
+    for r in so: r["type"] = "Order"
+
+    combined = sorted(si + so, key=lambda x: x.get("date") or "", reverse=True)
+    return combined[:int(limit)]
+
+
+@frappe.whitelist()
+def get_filter_options():
+    companies = frappe.db.get_list("Company", fields=["name"], order_by="name asc")
+    return {"companies": [c["name"] for c in companies]}
+
+
+# ── helpers: detect custom vs standard field names ───────────────────────────
+
+def _col_exists(table, column):
+    """Check if a column exists in a MariaDB table."""
+    result = frappe.db.sql(
+        "SELECT COUNT(*) FROM information_schema.COLUMNS "
+        "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = %s AND COLUMN_NAME = %s",
+        (table, column)
+    )
+    return result[0][0] > 0
+
+
+def _commercial_name_col(item_table):
+    """
+    Returns the actual column name for commercial_name in the given item table.
+    Supports both 'commercial_name' (server) and 'custom_commercial_name' (local dev).
+    """
+    if _col_exists(item_table, "commercial_name"):
+        return "commercial_name"
+    if _col_exists(item_table, "custom_commercial_name"):
+        return "custom_commercial_name"
+    return None
+
+
+# ── NEW: Commercial Name wise ─────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_commercial_name_wise(from_date=None, to_date=None, company=None, limit=15):
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    # Detect actual column name for this installation
+    si_col = _commercial_name_col("tabSales Invoice Item")
+    so_col = _commercial_name_col("tabSales Order Item")
+
+    if not si_col:
+        return {"by_invoice": [], "by_order": []}
+
+    rows = frappe.db.sql(
+        f"""SELECT
+                sii.{si_col} AS commercial_name,
+                SUM(sii.amount)   AS revenue,
+                SUM(sii.qty)      AS qty,
+                COUNT(DISTINCT si.name) AS invoices
+            FROM `tabSales Invoice Item` sii
+            INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND (sii.{si_col} IS NOT NULL AND sii.{si_col} != '')
+              {cf}
+            GROUP BY sii.{si_col}
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    # SO level — only if column exists
+    if not so_col:
+        return {"by_invoice": rows, "by_order": []}
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                soi.{so_col} AS commercial_name,
+                SUM(soi.amount)   AS order_value,
+                SUM(soi.qty)      AS qty
+            FROM `tabSales Order Item` soi
+            INNER JOIN `tabSales Order` so ON so.name = soi.parent
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND (soi.{so_col} IS NOT NULL AND soi.{so_col} != '')
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY soi.{so_col}
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": rows, "by_order": so_rows}
+
+
+# ── NEW: UOM wise ─────────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_uom_wise(from_date=None, to_date=None, company=None):
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                sii.uom,
+                SUM(sii.amount)   AS revenue,
+                SUM(sii.qty)      AS total_qty,
+                COUNT(DISTINCT si.name) AS invoices
+            FROM `tabSales Invoice Item` sii
+            INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND (sii.uom IS NOT NULL AND sii.uom != '')
+              {cf}
+            GROUP BY sii.uom
+            ORDER BY revenue DESC""",
+        p, as_dict=True,
+    )
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                soi.uom,
+                SUM(soi.amount)   AS order_value,
+                SUM(soi.qty)      AS total_qty,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Order Item` soi
+            INNER JOIN `tabSales Order` so ON so.name = soi.parent
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND (soi.uom IS NOT NULL AND soi.uom != '')
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY soi.uom
+            ORDER BY order_value DESC""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
+
+
+# ── NEW: State wise ───────────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_state_wise(from_date=None, to_date=None, company=None, limit=15):
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    # State comes from `place_of_supply` on SI header (e.g. "33-Tamil Nadu")
+    # We strip the code prefix to get clean state name
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                TRIM(SUBSTRING_INDEX(si.place_of_supply, '-', -1)) AS state,
+                SUM(si.grand_total)   AS revenue,
+                COUNT(si.name)        AS invoices,
+                SUM(si.grand_total - si.outstanding_amount) AS collected
+            FROM `tabSales Invoice` si
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND si.place_of_supply IS NOT NULL
+              AND si.place_of_supply != ''
+              {cf}
+            GROUP BY state
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                TRIM(SUBSTRING_INDEX(so.territory, '/', -1)) AS state,
+                SUM(so.grand_total)   AS order_value,
+                COUNT(so.name)        AS orders
+            FROM `tabSales Order` so
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND so.territory IS NOT NULL
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY state
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
+
+
+# ── NEW: Sales Person wise ────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_salesperson_wise(from_date=None, to_date=None, company=None, limit=15):
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                st.sales_person,
+                SUM(si.grand_total * st.allocated_percentage / 100) AS revenue,
+                COUNT(DISTINCT si.name) AS invoices,
+                SUM((si.grand_total - si.outstanding_amount) * st.allocated_percentage / 100) AS collected
+            FROM `tabSales Team` st
+            INNER JOIN `tabSales Invoice` si ON si.name = st.parent
+            WHERE si.docstatus = 1
+              AND st.parenttype = 'Sales Invoice'
+              AND si.posting_date BETWEEN %s AND %s
+              AND st.sales_person IS NOT NULL
+              {cf}
+            GROUP BY st.sales_person
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                st.sales_person,
+                SUM(so.grand_total * st.allocated_percentage / 100) AS order_value,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Team` st
+            INNER JOIN `tabSales Order` so ON so.name = st.parent
+            WHERE so.docstatus = 1
+              AND st.parenttype = 'Sales Order'
+              AND so.transaction_date BETWEEN %s AND %s
+              AND st.sales_person IS NOT NULL
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY st.sales_person
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
+
+
+# ── NEW: Cost Center wise ─────────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_cost_center_wise(from_date=None, to_date=None, company=None, limit=15):
+    """
+    Cost Center wise — aggregated from Sales Invoice Item.cost_center
+    and Sales Order Item.cost_center (item-level field is fully populated;
+    the header-level cost_center is mostly null in your data).
+    """
+    from_date, to_date = _date_args(from_date, to_date)
+    cf  = _cf(company)
+    p   = [from_date, to_date] + ([company] if company else [])
+    cf_so = cf.replace("si.company", "so.company")
+
+    # SI — item-level cost_center aggregated to invoice level
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                sii.cost_center,
+                SUM(sii.amount)         AS revenue,
+                SUM(sii.qty)            AS total_qty,
+                COUNT(DISTINCT si.name) AS invoices,
+                SUM(si.grand_total - si.outstanding_amount)
+                    * SUM(sii.amount) / NULLIF(SUM(si.grand_total), 0) AS collected
+            FROM `tabSales Invoice Item` sii
+            INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND sii.cost_center IS NOT NULL
+              AND sii.cost_center != ''
+              {cf}
+            GROUP BY sii.cost_center
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    # SO — item-level cost_center
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                soi.cost_center,
+                SUM(soi.amount)         AS order_value,
+                SUM(soi.qty)            AS total_qty,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Order Item` soi
+            INNER JOIN `tabSales Order` so ON so.name = soi.parent
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND soi.cost_center IS NOT NULL
+              AND soi.cost_center != ''
+              {cf_so}
+            GROUP BY soi.cost_center
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
+
+
+# ── NEW: Naming Series wise ───────────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_naming_series_wise(from_date=None, to_date=None, company=None, limit=20):
+    """
+    Naming Series wise breakdown — groups by the full naming_series value
+    and also extracts a human-readable prefix (everything before the first dot).
+    e.g. 'PTGB26/.#####' → prefix 'PTGB26', label 'PTGB26 (Tirupur Garments B2B)'
+    """
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                si.naming_series,
+                TRIM(SUBSTRING_INDEX(si.naming_series, '/', 1)) AS series_prefix,
+                SUM(si.grand_total)   AS revenue,
+                COUNT(si.name)        AS invoices,
+                SUM(si.grand_total - si.outstanding_amount) AS collected
+            FROM `tabSales Invoice` si
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND si.naming_series IS NOT NULL
+              AND si.naming_series != ''
+              {cf}
+            GROUP BY si.naming_series
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                so.naming_series,
+                TRIM(SUBSTRING_INDEX(so.naming_series, '/', 1)) AS series_prefix,
+                SUM(so.grand_total)   AS order_value,
+                COUNT(so.name)        AS orders
+            FROM `tabSales Order` so
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND so.naming_series IS NOT NULL
+              AND so.naming_series != ''
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY so.naming_series
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
+
+
+
+
+def check_app_permission():
+    return True
+
+has_app_permission = check_app_permission

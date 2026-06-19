@@ -1,0 +1,113 @@
+/* ── Dashboards App — Shared Styles ───────────────────────────────────────
+   Used by: dashboards hub page (/dashboards)
+   Each individual dashboard loads its own CSS via its HTML template.
+────────────────────────────────────────────────────────────────────────── */
+
+:root {
+  --db-blue:   #1565C0;
+  --db-teal:   #0097A7;
+  --db-green:  #2E7D32;
+  --db-amber:  #F57C00;
+  --db-red:    #C62828;
+  --db-purple: #6A1B9A;
+  --db-border: #E0E0E0;
+  --db-bg:     #F8FAFB;
+  --db-text:   #212121;
+  --db-muted:  #757575;
+  --db-shadow: 0 1px 6px rgba(0,0,0,.08);
+  --db-radius: 12px;
+}
+
+/* hub page grid */
+.db-hub {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+.db-hub__title {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--db-text);
+  margin-bottom: 6px;
+}
+
+.db-hub__sub {
+  font-size: 14px;
+  color: var(--db-muted);
+  margin-bottom: 32px;
+}
+
+.db-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+/* dashboard card on hub */
+.db-card {
+  background: #fff;
+  border: 1px solid var(--db-border);
+  border-radius: var(--db-radius);
+  padding: 24px;
+  box-shadow: var(--db-shadow);
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: box-shadow .2s, transform .15s;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.db-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,.12);
+  transform: translateY(-2px);
+  text-decoration: none;
+}
+
+.db-card--coming {
+  opacity: .55;
+  cursor: default;
+  pointer-events: none;
+}
+
+.db-card__accent {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  border-radius: var(--db-radius) var(--db-radius) 0 0;
+}
+
+.db-card__icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.db-card__title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--db-text);
+}
+
+.db-card__desc {
+  font-size: 12px;
+  color: var(--db-muted);
+  line-height: 1.5;
+}
+
+.db-card__tag {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: auto;
+  width: fit-content;
+}
+
+.db-card__tag--live   { background: #E8F5E9; color: #2E7D32; }
+.db-card__tag--soon   { background: #FFF3E0; color: #E65100; }
+.db-card__tag--planned{ background: #F3E5F5; color: #6A1B9A; }
