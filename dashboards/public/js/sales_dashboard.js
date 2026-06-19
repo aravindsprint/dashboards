@@ -267,7 +267,24 @@
           },
           options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => " ₹" + (c.parsed.y || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } } },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: c => " ₹" + (c.parsed.y || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } },
+              datalabels: {
+                anchor: "end", align: "top", offset: 6,
+                font: { size: 10, weight: "700" }, color: "#111",
+                backgroundColor: "rgba(255,255,255,0.9)",
+                borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
+                borderColor: "#ccc", borderWidth: 1,
+                formatter: function(v) {
+                  var n = parseFloat(v) || 0;
+                  if (n === 0) return "";
+                  if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
+                  if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
+                  return "Rs." + Math.round(n).toLocaleString("en-IN");
+                },
+              },
+            },
             scales: {
               x: { grid: { display: false }, ticks: { font: { size: 11 } } },
               y: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 11 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
@@ -283,7 +300,24 @@
         CH[id] = new Chart(el, {
           type: "doughnut",
           data: { labels: keys, datasets: [{ data: keys.map(k => breakdown[k]), backgroundColor: keys.map(colorFn), borderWidth: 2, borderColor: "#fff" }] },
-          options: { responsive: true, maintainAspectRatio: false, cutout: "65%", plugins: { legend: { display: false } } },
+          options: {
+            responsive: true, maintainAspectRatio: false, cutout: "55%",
+            plugins: {
+              legend: { display: false },
+              datalabels: {
+                display: true,
+                anchor: "center", align: "center",
+                font: { size: 12, weight: "700" }, color: "#fff",
+                textStrokeColor: "rgba(0,0,0,0.6)", textStrokeWidth: 3,
+                formatter: function(value, ctx) {
+                  var total = ctx.dataset.data.reduce(function(a,b){ return a+b; }, 0);
+                  var pct = total ? Math.round(value / total * 100) : 0;
+                  if (pct < 3) return "";
+                  return value + " (" + pct + "%)";
+                },
+              },
+            },
+          },
         });
       }
 
@@ -301,11 +335,29 @@
           data: { labels, datasets: [{ label: "Value", data: top.map(r => parseFloat(r[valueKey]) || 0), backgroundColor: color + "cc", borderRadius: 4 }] },
           options: {
             indexAxis: "y", responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => " ₹" + (c.parsed.x || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } } },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: c => " ₹" + (c.parsed.x || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } },
+              datalabels: {
+                anchor: "end", align: "right", offset: 6,
+                font: { size: 10, weight: "700" }, color: "#111",
+                backgroundColor: "rgba(255,255,255,0.9)",
+                borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
+                borderColor: "#ccc", borderWidth: 1, clip: false,
+                formatter: function(v) {
+                  var n = parseFloat(v) || 0;
+                  if (n === 0) return "";
+                  if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
+                  if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
+                  return "Rs." + Math.round(n).toLocaleString("en-IN");
+                },
+              },
+            },
             scales: {
               x: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 10 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
               y: { grid: { display: false }, ticks: { font: { size: 11 } } },
             },
+            layout: { padding: { right: 70 } },
           },
         });
       }
@@ -319,11 +371,28 @@
             data: { labels: rows.map(r => r.uom || "N/A"), datasets: [{ label: "Value", data: rows.map(r => parseFloat(r[valueKey]) || 0), backgroundColor: color + "cc", borderRadius: 4 }] },
             options: {
               responsive: true, maintainAspectRatio: false,
-              plugins: { legend: { display: false } },
+              plugins: {
+                legend: { display: false },
+                datalabels: {
+                  anchor: "end", align: "top", offset: 6,
+                  font: { size: 10, weight: "700" }, color: "#111",
+                  backgroundColor: "rgba(255,255,255,0.9)",
+                  borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
+                  borderColor: "#ccc", borderWidth: 1,
+                  formatter: function(v) {
+                    var n = parseFloat(v) || 0;
+                    if (n === 0) return "";
+                    if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
+                    if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
+                    return "Rs." + Math.round(n).toLocaleString("en-IN");
+                  },
+                },
+              },
               scales: {
                 x: { grid: { display: false }, ticks: { font: { size: 11 } } },
                 y: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 10 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
               },
+              layout: { padding: { top: 20 } },
             },
           });
         };
