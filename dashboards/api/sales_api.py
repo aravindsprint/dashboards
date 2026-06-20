@@ -491,9 +491,12 @@ def get_naming_series_wise(from_date=None, to_date=None, company=None, limit=20)
     return {"by_invoice": si_rows, "by_order": so_rows}
 
 
+# ── App screen permission check ───────────────────────────────────────────────
 
-
-def check_app_permission():
-    return True
-
-has_app_permission = check_app_permission
+def has_app_permission():
+    """Allow any logged-in user with Sales/Purchase/System Manager role."""
+    allowed_roles = {"Sales User", "Sales Manager", "Purchase User",
+                     "Purchase Manager", "Stock User", "Manufacturing User",
+                     "System Manager"}
+    user_roles = set(frappe.get_roles(frappe.session.user))
+    return bool(allowed_roles & user_roles)

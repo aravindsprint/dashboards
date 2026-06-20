@@ -109,6 +109,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-table td{padding:9px 12px;border-bottom:1px solid #F5F5F5}
 .sd-table tr:hover td{background:#FAFAFA}
 .sd-amt{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
+.sd-th-r{text-align:right !important}
 .sd-link{color:var(--b);text-decoration:none;font-weight:500}
 .sd-link:hover{text-decoration:underline}
 .sd-tbadge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
@@ -116,6 +117,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-tbadge.ord{background:#E0F7FA;color:#0097A7}
 .sd-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .sd-empty{text-align:center;color:var(--m);padding:28px;font-style:italic}
+
+/* cost center full cards */
+.sd-cc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.sd-cc-card{background:#fff;border:1px solid var(--br);border-radius:var(--rd);padding:16px;box-shadow:var(--sh);border-top:3px solid var(--t)}
+.sd-cc-title{font-size:13px;font-weight:700;color:var(--tx);margin-bottom:12px;text-transform:uppercase;letter-spacing:.4px}
+.sd-cc-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:600px){.sd-cc-kpis{grid-template-columns:repeat(2,1fr)}}
+.sd-cc-kpi{display:flex;flex-direction:column;gap:2px}
+.sd-cc-kpi-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--m)}
+.sd-cc-kpi-v{font-size:15px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
 
 /* ── breadcrumb & back link (Sales Dashboard) ── */
 .sd-back {
@@ -230,6 +241,45 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div class="sd-kpi-s"><div class="sd-prog"><div class="sd-progb" :class="summary.invoice.collection_rate>=80?'g':'a'" :style="{width:summary.invoice.collection_rate+'%'}"></div></div></div>
         </div>
       </div>
+      <div class="sd-slbl mt">Cost Centers</div>
+      <div class="sd-card" style="margin-bottom:0">
+        <div class="sd-twrap">
+          <table class="sd-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Cost Center</th>
+                <th class="sd-th-r">Revenue (SI)</th>
+                <th class="sd-th-r">Collected (SI)</th>
+                <th>Collection %</th>
+                <th class="sd-th-r">Invoices</th>
+                <th class="sd-th-r">Order Value (SO)</th>
+                <th class="sd-th-r">Orders</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row,i) in ccData.by_invoice" :key="row.cost_center">
+                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                <td><strong>{{ row.cost_center }}</strong></td>
+                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                <td>
+                  <div style="display:flex;align-items:center;gap:6px">
+                    <div class="sd-sbw" style="width:60px">
+                      <div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div>
+                    </div>
+                    <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
+                  </div>
+                </td>
+                <td class="sd-amt">{{ row.invoices }}</td>
+                <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
+                <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
+              </tr>
+              <tr v-if="!ccData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
       <div class="sd-slbl mt">Sales Orders</div>
       <div class="sd-kpis">
         <div class="sd-kpi"><div class="sd-kpi-l">Total Ordered</div><div class="sd-kpi-v">{{ fmt(summary.order.total_ordered) }}</div><div class="sd-kpi-s">{{ summary.order.count }} orders</div></div>
@@ -322,15 +372,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">Commercial Name Details</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>Commercial Name</th><th>Revenue (SI)</th><th>Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Qty (SO)</th></tr></thead>
+            <thead><tr><th>Commercial Name</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Qty (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Qty (SO)</th></tr></thead>
             <tbody>
               <tr v-for="row in commercialName.by_invoice" :key="row.commercial_name">
                 <td><strong>{{ cleanName(row.commercial_name) }}</strong></td>
                 <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td>{{ fmtQty(row.qty) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ fmtQty(row.qty) }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).order_value) }}</td>
-                <td>{{ fmtQty((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).qty) }}</td>
+                <td class="sd-amt">{{ fmtQty((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).qty) }}</td>
               </tr>
               <tr v-if="!commercialName.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
             </tbody>
@@ -356,16 +406,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">UOM Details</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>UOM</th><th>Revenue (SI)</th><th>Total Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Total Qty (SO)</th><th>Orders</th></tr></thead>
+            <thead><tr><th>UOM</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Total Qty (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Total Qty (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
             <tbody>
               <tr v-for="row in uomData.by_invoice" :key="row.uom">
                 <td><strong>{{ row.uom || '—' }}</strong></td>
                 <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td>{{ fmtQty(row.total_qty) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ fmtQty(row.total_qty) }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((uomData.by_order.find(r=>r.uom===row.uom)||{}).order_value) }}</td>
-                <td>{{ fmtQty((uomData.by_order.find(r=>r.uom===row.uom)||{}).total_qty) }}</td>
-                <td>{{ (uomData.by_order.find(r=>r.uom===row.uom)||{}).orders || '—' }}</td>
+                <td class="sd-amt">{{ fmtQty((uomData.by_order.find(r=>r.uom===row.uom)||{}).total_qty) }}</td>
+                <td class="sd-amt">{{ (uomData.by_order.find(r=>r.uom===row.uom)||{}).orders || '—' }}</td>
               </tr>
               <tr v-if="!uomData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
             </tbody>
@@ -391,15 +441,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">State Details</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>State</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+            <thead><tr><th>State</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
             <tbody>
               <tr v-for="(row,i) in stateData.by_invoice" :key="row.state">
                 <td><strong>{{ row.state || '—' }}</strong></td>
                 <td class="sd-amt">{{ fmt(row.revenue) }}</td>
                 <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((stateData.by_order.find(r=>r.state===row.state)||{}).order_value) }}</td>
-                <td>{{ (stateData.by_order.find(r=>r.state===row.state)||{}).orders || '—' }}</td>
+                <td class="sd-amt">{{ (stateData.by_order.find(r=>r.state===row.state)||{}).orders || '—' }}</td>
               </tr>
               <tr v-if="!stateData.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
             </tbody>
@@ -425,16 +475,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">Sales Person Performance</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Sales Person</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+            <thead><tr><th>#</th><th>Sales Person</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
             <tbody>
               <tr v-for="(row,i) in spData.by_invoice" :key="row.sales_person">
                 <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
                 <td><strong>{{ row.sales_person || '—' }}</strong></td>
                 <td class="sd-amt">{{ fmt(row.revenue) }}</td>
                 <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).order_value) }}</td>
-                <td>{{ (spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).orders || '—' }}</td>
+                <td class="sd-amt">{{ (spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).orders || '—' }}</td>
               </tr>
               <tr v-if="!spData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
             </tbody>
@@ -463,7 +513,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">Cost Center Details</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Cost Center</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Collection %</th><th>Qty (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Qty (SO)</th><th>Orders</th></tr></thead>
+            <thead><tr><th>#</th><th>Cost Center</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th>Collection %</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
             <tbody>
               <tr v-for="(row,i) in ccData.by_invoice" :key="row.cost_center">
                 <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -478,13 +528,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
                     <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
                   </div>
                 </td>
-                <td>{{ fmtQty(row.total_qty) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
-                <td>{{ fmtQty((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).total_qty) }}</td>
-                <td>{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
+                <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
               </tr>
-              <tr v-if="!ccData.by_invoice.length"><td colspan="10" class="sd-empty">No data available.</td></tr>
+              <tr v-if="!ccData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
         </div>
@@ -516,7 +564,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-ch"><span class="sd-ct">Naming Series Details</span></div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Naming Series</th><th>Prefix</th><th>Revenue (SI)</th><th>Collected (SI)</th><th>Invoices</th><th>Order Value (SO)</th><th>Orders</th></tr></thead>
+            <thead><tr><th>#</th><th>Naming Series</th><th>Prefix</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
             <tbody>
               <tr v-for="(row,i) in nsData.by_invoice" :key="row.naming_series">
                 <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -524,9 +572,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
                 <td><span class="sd-pill" style="background:#E3F2FD;color:#1565C0">{{ row.series_prefix }}</span></td>
                 <td class="sd-amt">{{ fmt(row.revenue) }}</td>
                 <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td>{{ row.invoices }}</td>
+                <td class="sd-amt">{{ row.invoices }}</td>
                 <td class="sd-amt">{{ fmt((nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).order_value) }}</td>
-                <td>{{ (nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).orders || '—' }}</td>
+                <td class="sd-amt">{{ (nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).orders || '—' }}</td>
               </tr>
               <tr v-if="!nsData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
@@ -544,7 +592,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>ID</th><th>Type</th><th>Customer</th><th>Date</th><th>Amount</th><th>Status</th></tr></thead>
+            <thead><tr><th>ID</th><th>Type</th><th>Customer</th><th>Date</th><th class="sd-th-r">Amount</th><th>Status</th></tr></thead>
             <tbody>
               <tr v-for="tx in filteredTransactions" :key="tx.name">
                 <td><a :href="txLink(tx)" target="_blank" class="sd-link">{{ tx.name }}</a></td>

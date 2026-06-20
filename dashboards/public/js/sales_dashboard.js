@@ -87,6 +87,7 @@
   createApp({
     setup() {
       const today = todayStr();
+      const DEFAULT_COMPANY = "Pranera Services and Solutions Pvt. Ltd.,";
       const filters = ref({ from_date: subMonths(today, 1), to_date: today, company: "" });
       const activeRange = ref("1M");
       const quickRanges = [
@@ -201,6 +202,9 @@
           uomData.value        = uom;
           stateData.value      = st;
           spData.value         = sp;
+          // Strip ' - PSS' suffix from cost center names
+          if (cc && cc.by_invoice) cc.by_invoice.forEach(r => { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
+          if (cc && cc.by_order)   cc.by_order.forEach(r =>   { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
           ccData.value         = cc;
           nsData.value         = ns;
           transactions.value   = tx;
@@ -222,6 +226,13 @@
         try {
           const o = await call("get_filter_options", {});
           companies.value = o.companies || [];
+          if (companies.value.includes(DEFAULT_COMPANY)) {
+            filters.value.company = DEFAULT_COMPANY;
+          } else if (companies.value.length > 0) {
+            // Default not found — pick the first available company
+            filters.value.company = companies.value[0];
+          }
+          await loadAll();
         } catch (e) { console.warn("Filter options failed:", e); }
       }
 
@@ -402,7 +413,6 @@
 
       onMounted(async () => {
         await loadFilterOptions();
-        await loadAll();
       });
 
       return {
