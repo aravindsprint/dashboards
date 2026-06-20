@@ -500,3 +500,8 @@ def has_app_permission():
                      "System Manager"}
     user_roles = set(frappe.get_roles(frappe.session.user))
     return bool(allowed_roles & user_roles)
+
+
+@frappe.whitelist()
+def check_app_permission():
+    return "System Manager" in frappe.get_roles()
