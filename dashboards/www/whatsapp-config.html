@@ -1,0 +1,669 @@
+<script>window.csrf_token="{{ csrf_token }}";</script>
+{%- raw -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <link rel="icon" type="image/svg+xml" href="/assets/dashboards/images/favicon.svg"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WhatsApp Config — Pranera ERP</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <style>
+:root{
+  --b:#25D366;--bd:#128C7E;--b2:#1565C0;--r:#C62828;--a:#F57C00;--g:#2E7D32;
+  --br:#E0E0E0;--bg:#F8FAFB;--tx:#212121;--m:#757575;--sh:0 1px 4px rgba(0,0,0,.07);--rd:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13px;color:var(--tx);background:var(--bg);min-height:100vh}
+
+.hdr{background:#fff;border-bottom:1px solid var(--br);padding:12px 20px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
+.hdr-back{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid var(--br);color:var(--m);text-decoration:none;flex-shrink:0;transition:.15s}
+.hdr-back:hover{background:var(--bg)}
+.hdr-logo{width:28px;height:28px;border-radius:6px;background:#25D366;display:flex;align-items:center;justify-content:center}
+.hdr-title{font-size:15px;font-weight:700}
+.hdr-sub{font-size:11px;color:var(--m)}
+
+.body{padding:20px;max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:800px){.body{grid-template-columns:1fr}}
+
+.card{background:#fff;border:1px solid var(--br);border-radius:var(--rd);padding:18px;box-shadow:var(--sh)}
+.card.full{grid-column:1/-1}
+.card-title{font-size:13px;font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:7px}
+.card-title .ico{font-size:16px}
+
+/* form */
+.fg{display:flex;flex-direction:column;gap:4px;margin-bottom:12px}
+.fg label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--m)}
+.fg input,.fg select,.fg textarea{font-size:13px;padding:7px 10px;border:1px solid var(--br);border-radius:6px;background:#fff;color:var(--tx);outline:none;width:100%;transition:.15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--b2)}
+.fg textarea{resize:vertical;min-height:60px}
+.fg-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+
+/* days */
+.days{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.day-btn{padding:5px 12px;border:1px solid var(--br);border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;background:#fff;color:var(--m);transition:.15s;user-select:none}
+.day-btn.active{background:#25D366;border-color:#25D366;color:#fff}
+.day-btn:hover:not(.active){border-color:#25D366;color:#25D366}
+
+/* time slots */
+.time-list{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.time-row{display:flex;align-items:center;gap:8px}
+.time-row input[type=time]{flex:1;font-size:13px;padding:6px 10px;border:1px solid var(--br);border-radius:6px;outline:none}
+.time-row input[type=time]:focus{border-color:var(--b2)}
+.btn-icon{width:28px;height:28px;border:1px solid var(--br);border-radius:6px;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--m);flex-shrink:0;transition:.15s}
+.btn-icon:hover{border-color:var(--r);color:var(--r)}
+.btn-icon.add{border-color:#25D366;color:#25D366}
+.btn-icon.add:hover{background:#25D366;color:#fff}
+
+/* recipient table */
+.rec-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.rec-search{font-size:12px;padding:5px 10px;border:1px solid var(--br);border-radius:6px;outline:none;flex:1;min-width:140px}
+.rec-search:focus{border-color:var(--b2)}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}
+.tbl th{background:var(--bg);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--m);padding:8px 10px;text-align:left;border-bottom:1px solid var(--br);white-space:nowrap}
+.tbl td{padding:8px 10px;border-bottom:1px solid #F5F5F5;vertical-align:middle}
+.tbl tr:hover td{background:#F9F9F9}
+.tbl input{font-size:12px;padding:4px 7px;border:1px solid var(--br);border-radius:4px;width:100%;outline:none}
+.tbl input:focus{border-color:var(--b2)}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px}
+.badge.act{background:#E8F5E9;color:#2E7D32}
+.badge.off{background:#FAFAFA;color:#9E9E9E}
+
+/* buttons */
+.btn{padding:8px 16px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:#25D366;color:#fff}
+.btn-primary:hover{background:#128C7E}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-sec{background:#fff;color:var(--b2);border:1px solid var(--b2)}
+.btn-sec:hover{background:#E3F2FD}
+.btn-danger{background:#fff;color:var(--r);border:1px solid var(--r)}
+.btn-danger:hover{background:#FFEBEE}
+.btn-sm{padding:4px 10px;font-size:11px}
+
+/* preview */
+.preview-box{background:#ECF3F3;border-radius:8px;padding:14px;font-size:13px;line-height:1.6;color:#111;position:relative;max-width:320px}
+.preview-box::before{content:'';position:absolute;top:10px;left:-8px;border:8px solid transparent;border-right-color:#ECF3F3;border-left:0}
+.preview-header{font-weight:700;margin-bottom:6px;font-size:14px}
+.preview-meta{font-size:10px;color:#999;margin-top:8px;text-align:right}
+.preview-kpi{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #D9E5E5}
+.preview-kpi:last-child{border-bottom:none}
+.preview-kpi-l{color:#555;font-size:12px}
+.preview-kpi-v{font-weight:700;font-size:12px}
+
+/* status */
+.status-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;font-size:12px;margin-bottom:14px}
+.status-bar.ok{background:#E8F5E9;color:#2E7D32;border:1px solid #A5D6A7}
+.status-bar.err{background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A}
+.status-bar.info{background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9}
+.status-bar.warn{background:#FFF8E1;color:#F57C00;border:1px solid #FFCC80}
+
+/* schedule summary */
+.sched-summary{background:#F1F8E9;border:1px solid #C5E1A5;border-radius:8px;padding:12px 14px;font-size:12px;color:#33691E;margin-top:14px}
+.sched-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sched-row:last-child{margin-bottom:0}
+
+/* send now modal overlay */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;display:flex;align-items:center;justify-content:center}
+.modal{background:#fff;border-radius:12px;padding:24px;width:420px;max-width:92vw;box-shadow:0 8px 32px rgba(0,0,0,.18)}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:14px}
+.modal-actions{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+
+/* log */
+.log-box{background:#1A1A1A;border-radius:8px;padding:12px;font-family:monospace;font-size:11px;color:#00E676;max-height:180px;overflow-y:auto;margin-top:10px;line-height:1.7}
+.log-box .err{color:#FF5252}
+.log-box .warn{color:#FFD740}
+.log-box .info{color:#40C4FF}
+
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.tag{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;background:#E8F5E9;color:#2E7D32}
+.tag.off{background:#F5F5F5;color:#9E9E9E}
+  </style>
+</head>
+<body>
+<script>
+(function(){
+  fetch("/api/method/frappe.auth.get_logged_user",{method:"GET",credentials:"same-origin"})
+    .then(r=>r.json()).then(d=>{
+      if(!d.message||d.message==="Guest")
+        window.location.href="/login?redirect-to=/whatsapp-config";
+    }).catch(()=>{ window.location.href="/login?redirect-to=/whatsapp-config"; });
+})();
+</script>
+
+<div id="app">
+  <!-- Header -->
+  <div class="hdr">
+    <a href="/dashboards" class="hdr-back" title="Back">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </a>
+    <div class="hdr-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.118 1.528 5.845L.057 23.428a.5.5 0 0 0 .609.61l5.676-1.484A11.95 11.95 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.907 0-3.686-.528-5.2-1.44l-.373-.22-3.865 1.01 1.027-3.75-.242-.386A9.937 9.937 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
+    </div>
+    <div>
+      <div class="hdr-title">WhatsApp Configuration</div>
+      <div class="hdr-sub">Schedule and send Sales Dashboard reports</div>
+    </div>
+    <div style="margin-left:auto;display:flex;gap:8px;align-items:center">
+      <span :class="['tag', config.enabled ? '' : 'off']">{{ config.enabled ? '● Scheduler ON' : '○ Scheduler OFF' }}</span>
+      <button class="btn btn-primary btn-sm" @click="showSendNow=true">▶ Send Now</button>
+      <button class="btn btn-sec btn-sm" @click="saveConfig" :disabled="saving">
+        <span v-if="saving" class="spinner"></span>
+        {{ saving ? 'Saving…' : '💾 Save' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="body">
+
+    <!-- ── Status bar ── -->
+    <div v-if="statusMsg.text" :class="['status-bar full', statusMsg.type]" style="grid-column:1/-1;margin-bottom:0">
+      {{ statusMsg.text }}
+    </div>
+
+    <!-- ── WhatsApp API Settings ── -->
+    <div class="card">
+      <div class="card-title"><span class="ico">⚙️</span> WhatsApp API Settings</div>
+      <div class="fg">
+        <label>Phone Number ID</label>
+        <input v-model="config.phoneId" placeholder="e.g. 400885946431044"/>
+      </div>
+      <div class="fg">
+        <label>Access Token</label>
+        <input v-model="config.token" type="password" placeholder="EAAQt…"/>
+      </div>
+      <div class="fg">
+        <label>Template Name</label>
+        <input v-model="config.templateName" placeholder="e.g. sales_summary"/>
+      </div>
+      <div class="fg-row">
+        <div class="fg">
+          <label>API Version</label>
+          <select v-model="config.apiVersion">
+            <option>v22.0</option><option>v21.0</option><option>v20.0</option>
+          </select>
+        </div>
+        <div class="fg">
+          <label>Language Code</label>
+          <input v-model="config.languageCode" placeholder="en"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Node Server URL</label>
+        <input v-model="config.nodeServerUrl" placeholder="http://localhost:3090"/>
+      </div>
+      <div class="fg" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:0">
+        <input type="checkbox" v-model="config.enabled" id="sched-on" style="width:16px;height:16px;cursor:pointer"/>
+        <label for="sched-on" style="text-transform:none;font-size:13px;cursor:pointer;letter-spacing:0">Enable scheduled sending</label>
+      </div>
+    </div>
+
+    <!-- ── Message Preview ── -->
+    <div class="card">
+      <div class="card-title"><span class="ico">👁️</span> Message Preview</div>
+      <div style="padding:10px 0">
+        <div class="preview-box">
+          <div style="font-size:10px;color:#777;border-bottom:1px solid #ccc;padding-bottom:5px;margin-bottom:7px">━━━━━━━━━━━━━━━━━━━</div>
+          <div class="preview-header">📊 Pranera Sales Report</div>
+          <div style="font-size:11px;color:#777;margin-bottom:8px;font-style:italic">{{ previewDateRange }}</div>
+          <div style="font-size:10px;color:#777;margin-bottom:6px">━━━━━━━━━━━━━━━━━━━</div>
+
+          <div style="font-size:11px;font-weight:700;color:#555;margin-bottom:5px">🧾 SALES INVOICES</div>
+          <div class="preview-kpi"><span class="preview-kpi-l">Total Invoiced</span><span class="preview-kpi-v">₹6.60 Cr <span style="font-weight:400;font-size:10px;color:#999">(1927)</span></span></div>
+          <div class="preview-kpi"><span class="preview-kpi-l">Collected</span><span class="preview-kpi-v">₹4.17 Cr</span></div>
+          <div class="preview-kpi"><span class="preview-kpi-l">Outstanding</span><span class="preview-kpi-v">₹2.43 Cr</span></div>
+          <div class="preview-kpi" style="border-bottom:none"><span class="preview-kpi-l">Collection Rate</span><span class="preview-kpi-v" style="color:#F57C00">63.18%</span></div>
+
+          <div style="font-size:11px;font-weight:700;color:#555;margin:8px 0 5px">🏢 COST CENTERS</div>
+          <div style="font-size:11px;line-height:1.8">
+            <div><strong>1. Pranera Textiles</strong></div>
+            <div style="color:#555">Revenue: ₹4.54 Cr | Collected: ₹3.88 Cr</div>
+            <div style="color:#555">[████████░░] 85% · 1366 invoices</div>
+            <div style="margin-top:4px"><strong>2. Main - PM</strong></div>
+            <div style="color:#555">Revenue: ₹1.14 Cr | Collected: ₹14</div>
+            <div style="color:#555">[░░░░░░░░░░] 0% · 95 invoices</div>
+            <div style="margin-top:4px"><strong>3. PRANERA (Apparel)</strong></div>
+            <div style="color:#555">Revenue: ₹22.50 L | Collected: ₹22.38 L</div>
+            <div style="color:#555">[██████████] 99% · 396 invoices</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:#555;margin:8px 0 5px">📦 SALES ORDERS</div>
+          <div class="preview-kpi"><span class="preview-kpi-l">Total Ordered</span><span class="preview-kpi-v">₹5.75 Cr <span style="font-weight:400;font-size:10px;color:#999">(750)</span></span></div>
+          <div class="preview-kpi"><span class="preview-kpi-l">To Deliver</span><span class="preview-kpi-v">582</span></div>
+          <div class="preview-kpi"><span class="preview-kpi-l">Fully Delivered</span><span class="preview-kpi-v">168</span></div>
+          <div class="preview-kpi" style="border-bottom:none"><span class="preview-kpi-l">Completed</span><span class="preview-kpi-v">165</span></div>
+
+          <div style="font-size:10px;color:#777;margin-top:7px;border-top:1px solid #ccc;padding-top:5px">━━━━━━━━━━━━━━━━━━━</div>
+          <div style="font-size:11px;color:#555;font-style:italic;margin-top:4px">{{ config.messageFooter || 'Pranera ERP · Auto Report' }}</div>
+          <div class="preview-meta">{{ previewTime }}</div>
+        </div>
+      </div>
+      <div class="fg" style="margin-top:12px">
+        <label>Message Footer</label>
+        <input v-model="config.messageFooter" placeholder="Pranera ERP · Auto Report"/>
+      </div>
+      <div class="fg">
+        <label>Date Range (days back)</label>
+        <select v-model="config.dateRangeDays">
+          <option value="1">Today</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label>Company Filter</label>
+        <input v-model="config.company" placeholder="Leave blank for all companies"/>
+      </div>
+    </div>
+
+    <!-- ── Schedule Settings ── -->
+    <div class="card">
+      <div class="card-title"><span class="ico">🗓️</span> Schedule Settings</div>
+
+      <div class="fg">
+        <label>Days of the week</label>
+        <div class="days">
+          <div v-for="d in weekDays" :key="d.val"
+               :class="['day-btn', config.scheduleDays.includes(d.val) ? 'active' : '']"
+               @click="toggleDay(d.val)">
+            {{ d.label }}
+          </div>
+        </div>
+      </div>
+
+      <div class="fg">
+        <label>Send times</label>
+        <div class="time-list">
+          <div v-for="(t, i) in config.scheduleTimes" :key="i" class="time-row">
+            <input type="time" v-model="config.scheduleTimes[i]"/>
+            <button class="btn-icon" @click="removeTime(i)" title="Remove">✕</button>
+          </div>
+          <div>
+            <button class="btn-icon add" @click="addTime" title="Add time">＋</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="fg" style="margin-bottom:0">
+        <label>Timezone</label>
+        <select v-model="config.timezone">
+          <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+          <option value="UTC">UTC</option>
+          <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+          <option value="Asia/Singapore">Asia/Singapore (SGT)</option>
+        </select>
+      </div>
+
+      <!-- Schedule summary -->
+      <div v-if="config.scheduleDays.length && config.scheduleTimes.length" class="sched-summary">
+        <div class="sched-row">📅 <strong>{{ schedDaysLabel }}</strong></div>
+        <div class="sched-row">⏰ <strong>{{ config.scheduleTimes.join(' · ') }}</strong></div>
+        <div class="sched-row">🌏 <strong>{{ config.timezone }}</strong></div>
+        <div class="sched-row">📨 <strong>{{ config.recipients.filter(r=>r.active).length }}</strong> active recipients</div>
+      </div>
+    </div>
+
+    <!-- ── Recipients ── -->
+    <div class="card">
+      <div class="card-title"><span class="ico">👥</span> Recipients</div>
+      <div class="rec-toolbar">
+        <input v-model="recSearch" class="rec-search" placeholder="Search name or number…"/>
+        <button class="btn btn-sec btn-sm" @click="addRecipient">＋ Add</button>
+        <button class="btn btn-sec btn-sm" @click="importRecipients">⬆ Import CSV</button>
+        <input ref="csvInput" type="file" accept=".csv" style="display:none" @change="handleCSV"/>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Phone (with country code)</th>
+              <th>Active</th>
+              <th style="width:32px"></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(r, i) in filteredRecipients" :key="r._id">
+              <td><input v-model="r.name" placeholder="Recipient name"/></td>
+              <td><input v-model="r.phone" placeholder="919876543210"/></td>
+              <td>
+                <input type="checkbox" v-model="r.active" style="width:15px;height:15px;cursor:pointer"/>
+              </td>
+              <td>
+                <button class="btn-icon" style="border-color:#ffcdd2;color:#c62828" @click="removeRecipient(r._id)">✕</button>
+              </td>
+            </tr>
+            <tr v-if="!filteredRecipients.length">
+              <td colspan="4" style="text-align:center;color:#9E9E9E;padding:20px;font-style:italic">
+                No recipients yet. Click ＋ Add to start.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── Send Log ── -->
+    <div class="card full">
+      <div class="card-title" style="justify-content:space-between">
+        <span><span class="ico">📋</span> Send Log</span>
+        <button class="btn btn-sec btn-sm" @click="loadLog">↻ Refresh</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="tbl">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Trigger</th>
+              <th>Recipients</th>
+              <th>Sent</th>
+              <th>Failed</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="l in sendLog" :key="l.id">
+              <td>{{ fmtDt(l.time) }}</td>
+              <td><span style="font-size:11px;background:#F5F5F5;padding:2px 7px;border-radius:4px">{{ l.trigger }}</span></td>
+              <td>{{ l.total }}</td>
+              <td style="color:#2E7D32;font-weight:600">{{ l.success }}</td>
+              <td style="color:#C62828;font-weight:600">{{ l.failed }}</td>
+              <td>
+                <span :class="['badge', l.status==='completed'?'act':'off']">{{ l.status }}</span>
+              </td>
+            </tr>
+            <tr v-if="!sendLog.length">
+              <td colspan="6" style="text-align:center;color:#9E9E9E;padding:20px;font-style:italic">No sends yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /body -->
+
+  <!-- ── Send Now Modal ── -->
+  <div v-if="showSendNow" class="overlay" @click.self="showSendNow=false">
+    <div class="modal">
+      <div class="modal-title">▶ Send Report Now</div>
+      <div class="fg">
+        <label>Date Range</label>
+        <select v-model="sendNowRange">
+          <option value="1">Today</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Recipients</label>
+        <select v-model="sendNowTarget">
+          <option value="all">All active recipients ({{ config.recipients.filter(r=>r.active).length }})</option>
+          <option value="test">Test only (first recipient)</option>
+        </select>
+      </div>
+      <div v-if="sending">
+        <div class="status-bar info">Sending in progress… please wait.</div>
+        <div class="log-box" ref="logBox">
+          <div v-for="(l,i) in sendLive" :key="i" :class="l.type">{{ l.text }}</div>
+        </div>
+      </div>
+      <div v-if="sendResult" :class="['status-bar', sendResult.failed>0 ? 'warn':'ok']" style="margin-top:10px">
+        ✓ Done — {{ sendResult.success }} sent, {{ sendResult.failed }} failed out of {{ sendResult.total }}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-sec" @click="showSendNow=false;sendResult=null;sendLive=[]">Close</button>
+        <button class="btn btn-primary" @click="sendNow" :disabled="sending">
+          <span v-if="sending" class="spinner"></span>
+          {{ sending ? 'Sending…' : '▶ Send' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+(function(){
+  const { createApp, ref, computed, onMounted } = Vue;
+
+  const WA_API_BASE = '/api/method/dashboards.api.whatsapp_api.';
+
+  function callApi(method, args) {
+    const params = new URLSearchParams();
+    for (const [k,v] of Object.entries(args||{})) {
+      if (v !== null && v !== undefined) params.set(k, typeof v==='object'?JSON.stringify(v):String(v));
+    }
+    return fetch('/api/method/dashboards.api.whatsapp_api.' + method + (params.toString()? '?'+params:''), {
+      credentials: 'same-origin', headers: { Accept: 'application/json' }
+    }).then(r=>r.json()).then(r=>{
+      if (r.message !== undefined) return r.message;
+      throw new Error(r.exc || 'API error');
+    });
+  }
+
+  function postApi(method, body) {
+    const csrf = window.csrf_token || '';
+    return fetch('/api/method/dashboards.api.whatsapp_api.' + method, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'X-Frappe-CSRF-Token': csrf,
+      },
+      body: JSON.stringify(body)
+    }).then(r=>r.json()).then(r=>{
+      if (r.message !== undefined) return r.message;
+      throw new Error(r.exc || 'API error');
+    });
+  }
+
+  createApp({
+    setup() {
+      const weekDays = [
+        {val:'mon',label:'Mon'},{val:'tue',label:'Tue'},{val:'wed',label:'Wed'},
+        {val:'thu',label:'Thu'},{val:'fri',label:'Fri'},{val:'sat',label:'Sat'},
+        {val:'sun',label:'Sun'},
+      ];
+
+      const config = ref({
+        phoneId: '400885946431044',
+        token: '',
+        templateName: 'sales_summary',
+        apiVersion: 'v22.0',
+        languageCode: 'en',
+        nodeServerUrl: 'http://localhost:3090',
+        enabled: false,
+        scheduleDays: ['mon','tue','wed','thu','fri'],
+        scheduleTimes: ['09:00','18:00'],
+        timezone: 'Asia/Kolkata',
+        dateRangeDays: '30',
+        company: '',
+        messageFooter: 'Pranera ERP · Auto Report',
+        recipients: [],
+      });
+
+      const saving = ref(false);
+      const statusMsg = ref({ text: '', type: 'ok' });
+      const recSearch = ref('');
+      const sendLog = ref([]);
+      const showSendNow = ref(false);
+      const sendNowRange = ref('30');
+      const sendNowTarget = ref('all');
+      const sending = ref(false);
+      const sendResult = ref(null);
+      const sendLive = ref([]);
+      const csvInput = ref(null);
+      const logBox = ref(null);
+      let _uid = 1;
+
+      const previewDateRange = computed(() => {
+        const d = new Date();
+        const to = d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+        d.setDate(d.getDate() - parseInt(config.value.dateRangeDays||30));
+        const from = d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+        return `${from} → ${to}`;
+      });
+
+      const previewTime = computed(() => new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+
+      const schedDaysLabel = computed(() => {
+        const dayNames = {mon:'Mon',tue:'Tue',wed:'Wed',thu:'Thu',fri:'Fri',sat:'Sat',sun:'Sun'};
+        return config.value.scheduleDays.map(d=>dayNames[d]).join(', ');
+      });
+
+      const filteredRecipients = computed(() => {
+        const q = recSearch.value.toLowerCase();
+        return config.value.recipients.filter(r =>
+          !q || (r.name||'').toLowerCase().includes(q) || (r.phone||'').includes(q)
+        );
+      });
+
+      function toggleDay(d) {
+        const idx = config.value.scheduleDays.indexOf(d);
+        if (idx>=0) config.value.scheduleDays.splice(idx,1);
+        else config.value.scheduleDays.push(d);
+      }
+
+      function addTime() { config.value.scheduleTimes.push('08:00'); }
+      function removeTime(i) { config.value.scheduleTimes.splice(i,1); }
+
+      function addRecipient() {
+        config.value.recipients.push({ _id: _uid++, name: '', phone: '', active: true });
+      }
+
+      function removeRecipient(id) {
+        config.value.recipients = config.value.recipients.filter(r => r._id !== id);
+      }
+
+      function importRecipients() { csvInput.value.click(); }
+
+      function handleCSV(e) {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+          const lines = ev.target.result.split('\n').filter(Boolean);
+          lines.forEach((line, i) => {
+            if (i===0 && line.toLowerCase().includes('name')) return;
+            const [name, phone] = line.split(',').map(s=>s.trim().replace(/"/g,''));
+            if (phone) config.value.recipients.push({ _id: _uid++, name: name||phone, phone, active: true });
+          });
+          setStatus('CSV imported successfully.', 'ok');
+        };
+        reader.readAsText(file);
+        e.target.value = '';
+      }
+
+      function setStatus(text, type='ok') {
+        statusMsg.value = { text, type };
+        setTimeout(() => { statusMsg.value.text = ''; }, 4000);
+      }
+
+      async function saveConfig() {
+        saving.value = true;
+        try {
+          await postApi('save_config', { config: config.value });
+          setStatus('Configuration saved successfully.', 'ok');
+        } catch(e) {
+          setStatus('Save failed: ' + e.message, 'err');
+        } finally {
+          saving.value = false;
+        }
+      }
+
+      async function loadConfig() {
+        try {
+          const c = await callApi('get_config', {});
+          if (c && c.phoneId) {
+            c.recipients = (c.recipients||[]).map((r,i)=>({...r, _id: _uid++}));
+            config.value = { ...config.value, ...c };
+          }
+        } catch(e) { console.warn('Could not load config:', e.message); }
+      }
+
+      async function loadLog() {
+        try {
+          const logs = await callApi('get_send_log', {});
+          sendLog.value = logs || [];
+        } catch(e) { console.warn('Log load failed:', e.message); }
+      }
+
+      async function sendNow() {
+        sending.value = true;
+        sendResult.value = null;
+        sendLive.value = [];
+        const log = (text, type='') => {
+          sendLive.value.push({ text, type });
+          if (logBox.value) logBox.value.scrollTop = logBox.value.scrollHeight;
+        };
+        try {
+          const recipients = sendNowTarget.value === 'test'
+            ? config.value.recipients.filter(r=>r.active).slice(0,1)
+            : config.value.recipients.filter(r=>r.active);
+
+          if (!recipients.length) { log('✗ No active recipients.', 'err'); return; }
+
+          log(`▸ Fetching dashboard summary (last ${sendNowRange.value} days)…`, 'info');
+          const summary = await callApi('get_summary_for_whatsapp', { days: sendNowRange.value, company: config.value.company });
+          log(`✓ Summary fetched: ₹${summary.total_invoiced_fmt} invoiced`, '');
+
+          log(`▸ Sending to ${recipients.length} recipient(s) via Node server…`, 'info');
+          const result = await postApi('send_whatsapp_report', {
+            recipients,
+            summary,
+            config: {
+              nodeServerUrl: config.value.nodeServerUrl,
+              token: config.value.token,
+              phoneId: config.value.phoneId,
+              templateName: config.value.templateName,
+              languageCode: config.value.languageCode,
+              apiVersion: config.value.apiVersion,
+              messageFooter: config.value.messageFooter,
+            },
+            trigger: 'manual',
+          });
+
+          result.details?.forEach(d => {
+            if (d.status === 'success') log(`  ✓ ${d.phone} — sent`, '');
+            else log(`  ✗ ${d.phone} — ${d.error}`, 'err');
+          });
+
+          sendResult.value = result;
+          log(`\n✅ Done: ${result.success} sent, ${result.failed} failed`, result.failed>0?'warn':'');
+        } catch(e) {
+          log('✗ Error: ' + e.message, 'err');
+        } finally {
+          sending.value = false;
+          loadLog();
+        }
+      }
+
+      function fmtDt(iso) {
+        if (!iso) return '—';
+        try { return new Date(iso).toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}); }
+        catch { return iso; }
+      }
+
+      onMounted(async () => {
+        await loadConfig();
+        await loadLog();
+      });
+
+      return {
+        weekDays, config, saving, statusMsg, recSearch, sendLog,
+        showSendNow, sendNowRange, sendNowTarget, sending, sendResult,
+        sendLive, csvInput, logBox,
+        previewDateRange, previewTime, schedDaysLabel, filteredRecipients,
+        toggleDay, addTime, removeTime, addRecipient, removeRecipient,
+        importRecipients, handleCSV, saveConfig, loadLog, sendNow, fmtDt,
+      };
+    }
+  }).mount('#app');
+})();
+</script>
+</body>
+</html>
+{%- endraw -%}
