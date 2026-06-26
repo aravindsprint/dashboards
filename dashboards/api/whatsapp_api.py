@@ -165,48 +165,96 @@ def get_summary_for_whatsapp(days=30, company=None):
     }
 
 
-# ── Build message text (matches the screenshot layout) ───────────────────────
+# ── Build {{1}}…{{11}} params matching the Meta template exactly ─────────────
+#
+#  Template body in Meta Business Suite:
+#
+#  📊 *Pranera Sales Report*
+#  _{{1}}_
+#  *Invoices*
+#  - Total Invoiced: *{{2}}*
+#  - Collected: *{{3}}*
+#  - Outstanding: *{{4}}*
+#  - Collection Rate: *{{5}}%*
+#  - Count: {{6}} invoices
+#  *Cost Centers*
+#  {{7}}
+#  *Orders*
+#  - Total Ordered: *{{8}}*
+#  - Count: {{9}} orders
+#  - To Deliver: *{{10}}*
+#  - Completed: *{{11}}*
+#  _{{12}}_
 
-def _build_message(s, footer="Pranera ERP · Auto Report"):
-    lines = [
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "📊 *Pranera Sales Report*",
-        f"_{s.get('from_date','')} → {s.get('to_date','')}_",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        "",
-        "🧾 *SALES INVOICES*",
-        f"• Total Invoiced : *{s.get('total_invoiced_fmt','—')}*  ({s.get('invoice_count',0)} invoices)",
-        f"• Collected      : *{s.get('total_collected_fmt','—')}*",
-        f"• Outstanding    : *{s.get('total_outstanding_fmt','—')}*",
-        f"• Collection Rate: *{s.get('collection_rate',0)}%*",
-        "",
-    ]
+def _build_template_params(s, footer="Pranera ERP · Auto Report"):
+    """Return ordered list of values for {{1}}…{{12}} in the Meta template."""
 
-    # Cost Centers table
+    # {{7}} — cost centers as a plain-text fixed-width table
     ccs = s.get("cost_centers", [])
     if ccs:
-        lines.append("🏢 *COST CENTERS*")
-        for i, cc in enumerate(ccs, 1):
-            bar_filled = round(cc['pct'] / 10)
-            bar = "█" * bar_filled + "░" * (10 - bar_filled)
-            lines.append(
-                f"{i}. *{cc['name']}*\n"
-                f"   Revenue: {cc['revenue']}  |  Collected: {cc['collected']}\n"
-                f"   [{bar}] {cc['pct']}%  •  {cc['invoices']} invoices"
-            )
-        lines.append("")
+        def _trunc(name, n=18):
+            return name if len(name) <= n else name[:n - 1] + "\u2026"
 
-    lines += [
-        "📦 *SALES ORDERS*",
-        f"• Total Ordered  : *{s.get('total_ordered_fmt','—')}*  ({s.get('order_count',0)} orders)",
-        f"• To Deliver     : *{s.get('to_deliver',0)}*",
-        f"• Fully Delivered: *{s.get('fully_delivered',0)}*",
-        f"• Completed      : *{s.get('completed_orders',0)}*",
-        "",
-        "━━━━━━━━━━━━━━━━━━━━━━",
-        f"_{footer}_",
+        hdr = f"{'#  Name':<20} {'Revenue':>9}  {'Collected':>10}  {'Inv':>4}  {'%':>4}"
+        sep = "\u2500" * 52
+        rows = [hdr, sep]
+
+        for i, cc in enumerate(ccs, 1):
+            name  = _trunc(cc["name"])
+            label = f"{i}. {name}"
+            rev   = cc["revenue"]
+            col   = cc["collected"]
+            inv   = str(cc["invoices"])
+            pct   = f"{cc['pct']}%"
+            rows.append(f"{label:<20} {rev:>9}  {col:>10}  {inv:>4}  {pct:>4}")
+
+        cc_block = "\n".join(rows)
+    else:
+        cc_block = "No cost center data"
+
+    return [
+        f"{s.get('from_date','')} → {s.get('to_date','')}",   # {{1}}  date range
+        s.get("total_invoiced_fmt",    "—"),                    # {{2}}  total invoiced
+        s.get("total_collected_fmt",   "—"),                    # {{3}}  collected
+        s.get("total_outstanding_fmt", "—"),                    # {{4}}  outstanding
+        str(s.get("collection_rate",   0)),                     # {{5}}  collection %
+        str(s.get("invoice_count",     0)),                     # {{6}}  invoice count
+        cc_block,                                               # {{7}}  cost centers
+        s.get("total_ordered_fmt",     "—"),                    # {{8}}  total ordered
+        str(s.get("order_count",       0)),                     # {{9}}  order count
+        str(s.get("to_deliver",        0)),                     # {{10}} to deliver
+        str(s.get("completed_orders",  0)),                     # {{11}} completed
+        footer,                                                 # {{12}} footer
     ]
-    return "\n".join(lines)
+
+
+def _build_message(s, footer="Pranera ERP · Auto Report"):
+    """Plain-text fallback (used when no template name is set)."""
+    ccs = s.get("cost_centers", [])
+    cc_lines = []
+    for i, cc in enumerate(ccs, 1):
+        cc_lines.append(
+            f"  {i}. {cc['name']}: {cc['revenue']} | {cc['pct']}% ({cc['invoices']} inv)"
+        )
+    cc_block = "\n".join(cc_lines) if cc_lines else "  —"
+
+    return (
+        f"📊 *Pranera Sales Report*\n"
+        f"_{s.get('from_date','')} → {s.get('to_date','')}_\n\n"
+        f"*Invoices*\n"
+        f"- Total Invoiced: *{s.get('total_invoiced_fmt','—')}*\n"
+        f"- Collected: *{s.get('total_collected_fmt','—')}*\n"
+        f"- Outstanding: *{s.get('total_outstanding_fmt','—')}*\n"
+        f"- Collection Rate: *{s.get('collection_rate',0)}%*\n"
+        f"- Count: {s.get('invoice_count',0)} invoices\n\n"
+        f"*Cost Centers*\n{cc_block}\n\n"
+        f"*Orders*\n"
+        f"- Total Ordered: *{s.get('total_ordered_fmt','—')}*\n"
+        f"- Count: {s.get('order_count',0)} orders\n"
+        f"- To Deliver: *{s.get('to_deliver',0)}*\n"
+        f"- Completed: *{s.get('completed_orders',0)}*\n\n"
+        f"_{footer}_"
+    )
 
 
 # ── Send single message via Meta Graph API ────────────────────────────────────
@@ -232,9 +280,8 @@ def _send_single(phone, summary, cfg):
         cc_text += f"\n{i}. {cc['name']}: {cc['revenue']} | {cc['pct']}% collected"
 
     if template:
-        # Meta template with variables — template body must use {{1}}…{{n}}
-        # Single-param approach: pass the full pre-built message as {{1}}
-        full_msg = _build_message(s, footer)
+        # Pass each {{1}}…{{12}} as a separate text parameter
+        params = _build_template_params(s, footer)
         body = {
             "messaging_product": "whatsapp",
             "to": str(phone),
@@ -244,7 +291,7 @@ def _send_single(phone, summary, cfg):
                 "language": {"code": lang},
                 "components": [{
                     "type": "body",
-                    "parameters": [{"type": "text", "text": full_msg}],
+                    "parameters": [{"type": "text", "text": p} for p in params],
                 }],
             },
         }
