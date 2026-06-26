@@ -26,3 +26,9 @@ fixtures = [
     {"doctype": "Page",      "filters": [["module", "in", ["Dashboard Module"]]]},
     {"doctype": "Workspace", "filters": [["module", "in", ["Dashboard Module"]]]},
 ]
+
+scheduler_events = {
+    "all": [
+        "dashboards.api.whatsapp_api.run_scheduled_whatsapp",
+    ],
+}
