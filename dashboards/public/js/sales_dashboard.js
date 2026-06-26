@@ -266,18 +266,24 @@
             call("get_naming_series_wise",   { ...a, limit: 20 }),
             call("get_recent_transactions",  { limit: 50, company: a.company }),
           ]);
-          summary.value        = s;
-          trend.value          = t;
-          topCustomers.value   = tc;
-          commercialName.value = cn;
-          uomData.value        = uom;
-          stateData.value      = st;
-          spData.value         = sp;
-          if (cc && cc.by_invoice) cc.by_invoice.forEach(r => { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
-          if (cc && cc.by_order)   cc.by_order.forEach(r =>   { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
-          ccData.value         = cc;
-          nsData.value         = ns;
-          transactions.value   = tx;
+          // Safe-assign every API response — guard against null/undefined
+          const EMPTY_BI = { by_invoice: [], by_order: [] };
+
+          summary.value        = s  || { invoice: { total_invoiced:0, total_collected:0, total_outstanding:0, collection_rate:0, count:0, status_breakdown:{} }, order: { total_ordered:0, count:0, status_breakdown:{}, delivery_breakdown:{} } };
+          trend.value          = t  || { invoices: [], orders: [] };
+          topCustomers.value   = tc || { ...EMPTY_BI };
+          commercialName.value = cn || { ...EMPTY_BI };
+          uomData.value        = uom|| { ...EMPTY_BI };
+          stateData.value      = st || { ...EMPTY_BI };
+          spData.value         = sp || { ...EMPTY_BI };
+
+          const safeCc = cc || { ...EMPTY_BI };
+          if (safeCc.by_invoice) safeCc.by_invoice.forEach(r => { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
+          if (safeCc.by_order)   safeCc.by_order.forEach(r =>   { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
+          ccData.value         = safeCc;
+
+          nsData.value         = ns || { ...EMPTY_BI };
+          transactions.value   = Array.isArray(tx) ? tx : [];
         } catch (e) {
           console.error("Dashboard load error:", e);
           if (window.frappe && frappe.msgprint) {
