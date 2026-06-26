@@ -15,7 +15,7 @@
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script>Chart.register(ChartDataLabels);</script>
+  <script>Chart.register(ChartDataLabels);</script>
   <style>
 :root{
   --b:#1565C0;--t:#0097A7;--g:#2E7D32;--a:#F57C00;--r:#C62828;--m:#757575;
@@ -67,8 +67,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 
 /* cards */
 .sd-card{background:#fff;border:1px solid var(--br);border-radius:var(--rd);padding:16px;box-shadow:var(--sh)}
-.sd-card.wide{}
-.sd-card.full{}
 .sd-ch{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:6px}
 .sd-ct{font-size:13px;font-weight:600}
 
@@ -102,12 +100,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-badge.inv{background:#E3F2FD;color:#1565C0}
 .sd-badge.ord{background:#E0F7FA;color:#0097A7}
 
+/* table toolbar */
+.sd-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.sd-search{font-size:12px;padding:5px 10px;border:1px solid var(--br);border-radius:6px;outline:none;min-width:180px}
+.sd-search:focus{border-color:var(--b)}
+
 /* table */
 .sd-twrap{overflow-x:auto}
 .sd-table{width:100%;border-collapse:collapse;font-size:13px}
-.sd-table th{background:var(--bg);color:var(--m);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;text-align:left;border-bottom:1px solid var(--br);white-space:nowrap}
+.sd-table th{background:var(--bg);color:var(--m);font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;text-align:left;border-bottom:1px solid var(--br);white-space:nowrap;cursor:pointer;user-select:none}
+.sd-table th:hover{color:var(--b)}
+.sd-table th.active{color:var(--b)}
+.sd-sort{font-size:10px;margin-left:3px;opacity:.5}
+.sd-sort.on{opacity:1;color:var(--b)}
 .sd-table td{padding:9px 12px;border-bottom:1px solid #F5F5F5}
-.sd-table tr:hover td{background:#FAFAFA}
+.sd-table tr.clickable{cursor:pointer}
+.sd-table tr.clickable:hover td{background:#F0F7FF}
+.sd-table tr.drill-open td{background:#EBF5FF;font-weight:500}
 .sd-amt{font-variant-numeric:tabular-nums;font-weight:600;text-align:right}
 .sd-th-r{text-align:right !important}
 .sd-link{color:var(--b);text-decoration:none;font-weight:500}
@@ -117,6 +126,24 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-tbadge.ord{background:#E0F7FA;color:#0097A7}
 .sd-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .sd-empty{text-align:center;color:var(--m);padding:28px;font-style:italic}
+
+/* drill-down panel */
+.sd-drill{background:#F0F7FF;border-top:2px solid #1565C020;padding:0}
+.sd-drill-inner{padding:14px 16px}
+.sd-drill-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--b);margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.sd-drill-loading{padding:16px;text-align:center;color:var(--m);font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px}
+.sd-mini-spin{width:14px;height:14px;border:2px solid #ccc;border-top-color:var(--b);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
+.sd-drill table{width:100%;border-collapse:collapse;font-size:12px}
+.sd-drill table th{background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:6px 10px;text-align:left;white-space:nowrap;border-bottom:1px solid #BBDEFB}
+.sd-drill table td{padding:7px 10px;border-bottom:1px solid #E3F2FD;color:var(--tx)}
+.sd-drill table tr:last-child td{border-bottom:none}
+.sd-drill table tr:hover td{background:#DDEEFF}
+.sd-drill .sd-amt{text-align:right;font-weight:600}
+.sd-drill .sd-th-r{text-align:right!important}
+.sd-drill-empty{padding:12px;text-align:center;color:var(--m);font-style:italic;font-size:12px}
+.sd-mono{font-family:monospace;font-size:11px;background:#E3F2FD;padding:1px 5px;border-radius:3px;color:#1565C0}
+.sd-chevron{display:inline-block;transition:transform .2s;font-size:10px;margin-left:4px}
+.sd-chevron.open{transform:rotate(180deg)}
 
 /* cost center full cards */
 .sd-cc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
@@ -128,56 +155,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-cc-kpi-l{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--m)}
 .sd-cc-kpi-v{font-size:15px;font-weight:700;color:var(--tx);font-variant-numeric:tabular-nums}
 
-/* ── breadcrumb & back link (Sales Dashboard) ── */
-.sd-back {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  border: 1px solid var(--br);
-  color: var(--m);
-  text-decoration: none;
-  flex-shrink: 0;
-  transition: .15s all;
-}
-.sd-back:hover { background: var(--bg); color: var(--tx); }
+/* breadcrumb & back */
+.sd-back{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;border:1px solid var(--br);color:var(--m);text-decoration:none;flex-shrink:0;transition:.15s all}
+.sd-back:hover{background:var(--bg);color:var(--tx)}
+.sd-title-group{display:flex;flex-direction:column;gap:1px}
+.sd-breadcrumb{font-size:11px;color:var(--m)}
+.sd-breadcrumb a{color:var(--b);text-decoration:none}
+.sd-breadcrumb a:hover{text-decoration:underline}
 
-.sd-title-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.sd-breadcrumb {
-  font-size: 11px;
-  color: var(--m);
-}
-.sd-breadcrumb a {
-  color: var(--b);
-  text-decoration: none;
-}
-.sd-breadcrumb a:hover { text-decoration: underline; }
-
-/* ── info bar (Naming Series tab) ── */
-.sd-info-bar {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: #E8F4FD;
-  border: 1px solid #BBDEFB;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12px;
-  color: #1A237E;
-  line-height: 1.5;
-}
-.sd-info-bar code {
-  background: #BBDEFB;
-  padding: 1px 5px;
-  border-radius: 3px;
-  font-size: 11px;
-}
+/* info bar */
+.sd-info-bar{display:flex;align-items:flex-start;gap:8px;background:#E8F4FD;border:1px solid #BBDEFB;border-radius:8px;padding:10px 14px;font-size:12px;color:#1A237E;line-height:1.5}
+.sd-info-bar code{background:#BBDEFB;padding:1px 5px;border-radius:3px;font-size:11px}
   </style>
 </head>
 <body>
@@ -192,7 +180,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 </script>
 <div id="sales-dashboard-app">
 
-  <!-- ── Header ── -->
+  <!-- Header -->
   <div class="sd-header">
     <div class="sd-header__left">
       <a href="/dashboards" class="sd-back" title="All Dashboards">
@@ -219,18 +207,18 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
     </div>
   </div>
 
-  <!-- loading -->
+  <!-- Loading -->
   <div v-if="loading" class="sd-loading"><div class="sd-spinner"></div><span>Loading…</span></div>
 
   <template v-else>
-    <!-- ── Tabs ── -->
+    <!-- Tabs -->
     <div class="sd-tabs">
       <button v-for="t in tabs" :key="t.key" :class="['sd-tab',{active:activeTab===t.key}]" @click="activeTab=t.key">
         <span class="sd-tab-icon">{{ t.icon }}</span>{{ t.label }}
       </button>
     </div>
 
-    <!-- ═══════════════════════ OVERVIEW ═══════════════════════ -->
+    <!-- ═══════════════ OVERVIEW ═══════════════ -->
     <div v-show="activeTab==='overview'" class="sd-body">
       <div class="sd-slbl">Sales Invoices</div>
       <div class="sd-kpis">
@@ -241,40 +229,75 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div class="sd-kpi-s"><div class="sd-prog"><div class="sd-progb" :class="summary.invoice.collection_rate>=80?'g':'a'" :style="{width:summary.invoice.collection_rate+'%'}"></div></div></div>
         </div>
       </div>
-      <div class="sd-slbl mt">Cost Centers</div>
+      <div class="sd-slbl mt">Top Customers — Cost Center Summary</div>
       <div class="sd-card" style="margin-bottom:0">
+        <div class="sd-toolbar">
+          <input v-model="filterText['ov_cc']" class="sd-search" placeholder="Filter cost centers…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
             <thead>
               <tr>
                 <th>#</th>
-                <th>Cost Center</th>
-                <th class="sd-th-r">Revenue (SI)</th>
-                <th class="sd-th-r">Collected (SI)</th>
+                <th @click="toggleSort('ov_cc','cost_center')">Cost Center <span :class="['sd-sort',{on:sortIconActive('ov_cc','cost_center')}]">{{ sortIcon('ov_cc','cost_center') }}</span></th>
+                <th class="sd-th-r" @click="toggleSort('ov_cc','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('ov_cc','revenue')}]">{{ sortIcon('ov_cc','revenue') }}</span></th>
+                <th class="sd-th-r" @click="toggleSort('ov_cc','collected')">Collected <span :class="['sd-sort',{on:sortIconActive('ov_cc','collected')}]">{{ sortIcon('ov_cc','collected') }}</span></th>
                 <th>Collection %</th>
-                <th class="sd-th-r">Invoices</th>
+                <th class="sd-th-r" @click="toggleSort('ov_cc','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('ov_cc','invoices')}]">{{ sortIcon('ov_cc','invoices') }}</span></th>
                 <th class="sd-th-r">Order Value (SO)</th>
                 <th class="sd-th-r">Orders</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(row,i) in ccData.by_invoice" :key="row.cost_center">
-                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
-                <td><strong>{{ row.cost_center }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <div class="sd-sbw" style="width:60px">
-                      <div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div>
+              <template v-for="(row,i) in sortedRows('ov_cc', ccData.by_invoice, ['revenue','collected','invoices'])" :key="row.cost_center">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('ov_cc',row.cost_center)}"
+                    @click="toggleDrill('ov_cc', row.cost_center, 'cost_center_customers', {cost_center: row.cost_center})">
+                  <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                  <td><strong>{{ row.cost_center }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('ov_cc',row.cost_center)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="sd-sbw" style="width:60px"><div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div></div>
+                      <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
                     </div>
-                    <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
-                  </div>
-                </td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
-              </tr>
+                  </td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('ov_cc', row.cost_center)" class="sd-drill">
+                  <td colspan="8" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.cost_center }} — customers &amp; sales persons</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Customer</th>
+                            <th class="sd-th-r">Revenue (SI)</th>
+                            <th class="sd-th-r">Invoices</th>
+                            <th>Sales Person</th>
+                            <th class="sd-th-r">Order Value (SO)</th>
+                            <th class="sd-th-r">Orders</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.customer">
+                              <td>{{ d.customer }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                              <td class="sd-amt">{{ d.invoices }}</td>
+                              <td>{{ d.sales_person || '—' }}</td>
+                              <td class="sd-amt">{{ fmt(d.order_value) }}</td>
+                              <td class="sd-amt">{{ d.orders || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No drill-down data available.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!ccData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -285,7 +308,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         <div class="sd-kpi"><div class="sd-kpi-l">Total Ordered</div><div class="sd-kpi-v">{{ fmt(summary.order.total_ordered) }}</div><div class="sd-kpi-s">{{ summary.order.count }} orders</div></div>
         <div class="sd-kpi t"><div class="sd-kpi-l">To Deliver</div><div class="sd-kpi-v">{{ (summary.order.delivery_breakdown['Not Delivered']||0)+(summary.order.delivery_breakdown['Partly Delivered']||0) }}</div><div class="sd-kpi-s">orders pending</div></div>
         <div class="sd-kpi g"><div class="sd-kpi-l">Fully Delivered</div><div class="sd-kpi-v">{{ summary.order.delivery_breakdown['Fully Delivered']||0 }}</div><div class="sd-kpi-s">completed</div></div>
-        <div class="sd-kpi"><div class="sd-kpi-l">Completed Orders</div><div class="sd-kpi-v">{{ summary.order.status_breakdown['Completed']||0 }}</div><div class="sd-kpi-s">billed & delivered</div></div>
+        <div class="sd-kpi"><div class="sd-kpi-l">Completed Orders</div><div class="sd-kpi-v">{{ summary.order.status_breakdown['Completed']||0 }}</div><div class="sd-kpi-s">billed &amp; delivered</div></div>
       </div>
       <div class="sd-chart-row">
         <div class="sd-card wide">
@@ -315,7 +338,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ SALES INVOICES ═══════════════════════ -->
+    <!-- ═══════════════ SALES INVOICES ═══════════════ -->
     <div v-show="activeTab==='invoices'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -333,9 +356,67 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           </div>
         </div>
       </div>
+      <!-- Top customers table with drill → item lines -->
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge inv">Invoices</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['si_cust']" class="sd-search" placeholder="Filter customers…"/>
+        </div>
+        <div class="sd-twrap">
+          <table class="sd-table">
+            <thead><tr>
+              <th @click="toggleSort('si_cust','customer')">Customer <span :class="['sd-sort',{on:sortIconActive('si_cust','customer')}]">{{ sortIcon('si_cust','customer') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('si_cust','revenue')">Revenue <span :class="['sd-sort',{on:sortIconActive('si_cust','revenue')}]">{{ sortIcon('si_cust','revenue') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('si_cust','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('si_cust','invoices')}]">{{ sortIcon('si_cust','invoices') }}</span></th>
+            </tr></thead>
+            <tbody>
+              <template v-for="row in sortedRows('si_cust', topCustomers.by_invoice, ['revenue','invoices'])" :key="row.customer">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('si_cust',row.customer)}"
+                    @click="toggleDrill('si_cust', row.customer, 'customer_items', {customer: row.customer})">
+                  <td><strong>{{ row.customer }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('si_cust',row.customer)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('si_cust', row.customer)" class="sd-drill">
+                  <td colspan="3" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.customer }} — item codes &amp; commercial names</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Commercial Name</th>
+                            <th>UOM</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Revenue</th>
+                            <th>Sales Person</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ cleanName(d.commercial_name || d.item_name) }}</td>
+                              <td>{{ d.uom }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                              <td>{{ d.sales_person || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No item details found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="!topCustomers.by_invoice.length"><td colspan="3" class="sd-empty">No data.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- ═══════════════════════ SALES ORDERS ═══════════════════════ -->
+    <!-- ═══════════════ SALES ORDERS ═══════════════ -->
     <div v-show="activeTab==='orders'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -353,9 +434,67 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           </div>
         </div>
       </div>
+      <!-- Customer table with drill → item lines -->
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge ord">Orders</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['so_cust']" class="sd-search" placeholder="Filter customers…"/>
+        </div>
+        <div class="sd-twrap">
+          <table class="sd-table">
+            <thead><tr>
+              <th @click="toggleSort('so_cust','customer')">Customer <span :class="['sd-sort',{on:sortIconActive('so_cust','customer')}]">{{ sortIcon('so_cust','customer') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('so_cust','order_value')">Order Value <span :class="['sd-sort',{on:sortIconActive('so_cust','order_value')}]">{{ sortIcon('so_cust','order_value') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('so_cust','orders')">Orders <span :class="['sd-sort',{on:sortIconActive('so_cust','orders')}]">{{ sortIcon('so_cust','orders') }}</span></th>
+            </tr></thead>
+            <tbody>
+              <template v-for="row in sortedRows('so_cust', topCustomers.by_order, ['order_value','orders'])" :key="row.customer">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('so_cust',row.customer)}"
+                    @click="toggleDrill('so_cust', row.customer, 'customer_order_items', {customer: row.customer})">
+                  <td><strong>{{ row.customer }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('so_cust',row.customer)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.order_value) }}</td>
+                  <td class="sd-amt">{{ row.orders }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('so_cust', row.customer)" class="sd-drill">
+                  <td colspan="3" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.customer }} — item codes &amp; commercial names (orders)</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Commercial Name</th>
+                            <th>UOM</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Order Value</th>
+                            <th>Sales Person</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ cleanName(d.commercial_name || d.item_name) }}</td>
+                              <td>{{ d.uom }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.order_value) }}</td>
+                              <td>{{ d.sales_person || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No item details found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <tr v-if="!topCustomers.by_order.length"><td colspan="3" class="sd-empty">No data.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-    <!-- ═══════════════════════ COMMERCIAL NAME ═══════════════════════ -->
+    <!-- ═══════════════ COMMERCIAL NAME ═══════════════ -->
     <div v-show="activeTab==='commercial_name'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -367,21 +506,67 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div :style="{position:'relative',height:Math.max(240,commercialName.by_order.length*36+60)+'px'}"><canvas id="cnSOChart" role="img" aria-label="Commercial name order value"></canvas></div>
         </div>
       </div>
-      <!-- table -->
+      <!-- Commercial name table → drill to item codes + customers -->
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">Commercial Name Details</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['cn']" class="sd-search" placeholder="Filter commercial names…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>Commercial Name</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Qty (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Qty (SO)</th></tr></thead>
+            <thead><tr>
+              <th @click="toggleSort('cn','commercial_name')">Commercial Name <span :class="['sd-sort',{on:sortIconActive('cn','commercial_name')}]">{{ sortIcon('cn','commercial_name') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('cn','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('cn','revenue')}]">{{ sortIcon('cn','revenue') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('cn','qty')">Qty (SI) <span :class="['sd-sort',{on:sortIconActive('cn','qty')}]">{{ sortIcon('cn','qty') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('cn','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('cn','invoices')}]">{{ sortIcon('cn','invoices') }}</span></th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Qty (SO)</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="row in commercialName.by_invoice" :key="row.commercial_name">
-                <td><strong>{{ cleanName(row.commercial_name) }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmtQty(row.qty) }}</td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ fmtQty((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).qty) }}</td>
-              </tr>
+              <template v-for="row in sortedRows('cn', commercialName.by_invoice, ['revenue','qty','invoices'])" :key="row.commercial_name">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('cn',row.commercial_name)}"
+                    @click="toggleDrill('cn', row.commercial_name, 'commercial_name_detail', {commercial_name: row.commercial_name})">
+                  <td><strong>{{ cleanName(row.commercial_name) }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('cn',row.commercial_name)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmtQty(row.qty) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ fmtQty((commercialName.by_order.find(r=>r.commercial_name===row.commercial_name)||{}).qty) }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('cn', row.commercial_name)" class="sd-drill">
+                  <td colspan="6" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ cleanName(row.commercial_name) }} — item codes &amp; top customers</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Item Name</th>
+                            <th>UOM</th>
+                            <th>Customer</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Revenue</th>
+                            <th>Sales Person</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code+d.customer">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ d.item_name }}</td>
+                              <td>{{ d.uom }}</td>
+                              <td>{{ d.customer }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                              <td>{{ d.sales_person || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No detail data found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!commercialName.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -389,7 +574,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ UOM ═══════════════════════ -->
+    <!-- ═══════════════ UOM ═══════════════ -->
     <div v-show="activeTab==='uom'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -401,22 +586,62 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div style="position:relative;height:260px"><canvas id="uomSOChart" role="img" aria-label="UOM order value"></canvas></div>
         </div>
       </div>
-      <!-- UOM detail table -->
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">UOM Details</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['uom']" class="sd-search" placeholder="Filter UOM…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>UOM</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Total Qty (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Total Qty (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
+            <thead><tr>
+              <th @click="toggleSort('uom','uom')">UOM <span :class="['sd-sort',{on:sortIconActive('uom','uom')}]">{{ sortIcon('uom','uom') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('uom','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('uom','revenue')}]">{{ sortIcon('uom','revenue') }}</span></th>
+              <th class="sd-th-r">Total Qty (SI)</th>
+              <th class="sd-th-r">Invoices</th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Total Qty (SO)</th>
+              <th class="sd-th-r">Orders</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="row in uomData.by_invoice" :key="row.uom">
-                <td><strong>{{ row.uom || '—' }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmtQty(row.total_qty) }}</td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((uomData.by_order.find(r=>r.uom===row.uom)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ fmtQty((uomData.by_order.find(r=>r.uom===row.uom)||{}).total_qty) }}</td>
-                <td class="sd-amt">{{ (uomData.by_order.find(r=>r.uom===row.uom)||{}).orders || '—' }}</td>
-              </tr>
+              <template v-for="row in sortedRows('uom', uomData.by_invoice, ['revenue','total_qty','invoices'])" :key="row.uom">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('uom',row.uom)}"
+                    @click="toggleDrill('uom', row.uom, 'uom_items', {uom: row.uom})">
+                  <td><strong>{{ row.uom || '—' }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('uom',row.uom)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmtQty(row.total_qty) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((uomData.by_order.find(r=>r.uom===row.uom)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ fmtQty((uomData.by_order.find(r=>r.uom===row.uom)||{}).total_qty) }}</td>
+                  <td class="sd-amt">{{ (uomData.by_order.find(r=>r.uom===row.uom)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('uom', row.uom)" class="sd-drill">
+                  <td colspan="7" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.uom }} — item codes &amp; commercial names</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Commercial Name</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Revenue</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ cleanName(d.commercial_name || d.item_name) }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No item data found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!uomData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -424,7 +649,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ STATE ═══════════════════════ -->
+    <!-- ═══════════════ STATE ═══════════════ -->
     <div v-show="activeTab==='state'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -436,21 +661,62 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div :style="{position:'relative',height:Math.max(240,stateData.by_order.length*36+60)+'px'}"><canvas id="stateSOChart" role="img" aria-label="Order value by state"></canvas></div>
         </div>
       </div>
-      <!-- State table -->
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">State Details</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['state']" class="sd-search" placeholder="Filter states…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>State</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
+            <thead><tr>
+              <th @click="toggleSort('state','state')">State <span :class="['sd-sort',{on:sortIconActive('state','state')}]">{{ sortIcon('state','state') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('state','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('state','revenue')}]">{{ sortIcon('state','revenue') }}</span></th>
+              <th class="sd-th-r">Collected (SI)</th>
+              <th class="sd-th-r" @click="toggleSort('state','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('state','invoices')}]">{{ sortIcon('state','invoices') }}</span></th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Orders</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="(row,i) in stateData.by_invoice" :key="row.state">
-                <td><strong>{{ row.state || '—' }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((stateData.by_order.find(r=>r.state===row.state)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ (stateData.by_order.find(r=>r.state===row.state)||{}).orders || '—' }}</td>
-              </tr>
+              <template v-for="row in sortedRows('state', stateData.by_invoice, ['revenue','collected','invoices'])" :key="row.state">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('state',row.state)}"
+                    @click="toggleDrill('state', row.state, 'state_customers', {state: row.state})">
+                  <td><strong>{{ row.state || '—' }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('state',row.state)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((stateData.by_order.find(r=>r.state===row.state)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ (stateData.by_order.find(r=>r.state===row.state)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('state', row.state)" class="sd-drill">
+                  <td colspan="6" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.state }} — customers</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Customer</th>
+                            <th class="sd-th-r">Revenue</th>
+                            <th class="sd-th-r">Invoices</th>
+                            <th class="sd-th-r">Order Value</th>
+                            <th class="sd-th-r">Orders</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.customer">
+                              <td>{{ d.customer }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                              <td class="sd-amt">{{ d.invoices }}</td>
+                              <td class="sd-amt">{{ fmt(d.order_value) }}</td>
+                              <td class="sd-amt">{{ d.orders || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No customers found for this state.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!stateData.by_invoice.length"><td colspan="6" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -458,7 +724,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ SALES PERSON ═══════════════════════ -->
+    <!-- ═══════════════ SALES PERSON ═══════════════ -->
     <div v-show="activeTab==='salesperson'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
@@ -470,22 +736,66 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <div :style="{position:'relative',height:Math.max(240,spData.by_order.length*36+60)+'px'}"><canvas id="spSOChart" role="img" aria-label="Order value by sales person"></canvas></div>
         </div>
       </div>
-      <!-- SP table -->
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">Sales Person Performance</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['sp']" class="sd-search" placeholder="Filter sales persons…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Sales Person</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
+            <thead><tr>
+              <th>#</th>
+              <th @click="toggleSort('sp','sales_person')">Sales Person <span :class="['sd-sort',{on:sortIconActive('sp','sales_person')}]">{{ sortIcon('sp','sales_person') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('sp','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('sp','revenue')}]">{{ sortIcon('sp','revenue') }}</span></th>
+              <th class="sd-th-r">Collected (SI)</th>
+              <th class="sd-th-r" @click="toggleSort('sp','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('sp','invoices')}]">{{ sortIcon('sp','invoices') }}</span></th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Orders</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="(row,i) in spData.by_invoice" :key="row.sales_person">
-                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
-                <td><strong>{{ row.sales_person || '—' }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ (spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).orders || '—' }}</td>
-              </tr>
+              <template v-for="(row,i) in sortedRows('sp', spData.by_invoice, ['revenue','collected','invoices'])" :key="row.sales_person">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('sp',row.sales_person)}"
+                    @click="toggleDrill('sp', row.sales_person, 'salesperson_items', {sales_person: row.sales_person})">
+                  <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                  <td><strong>{{ row.sales_person || '—' }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('sp',row.sales_person)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ (spData.by_order.find(r=>r.sales_person===row.sales_person)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('sp', row.sales_person)" class="sd-drill">
+                  <td colspan="7" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.sales_person }} — item codes &amp; customers</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Commercial Name</th>
+                            <th>Customer</th>
+                            <th>UOM</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Revenue</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code+d.customer">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ cleanName(d.commercial_name || d.item_name) }}</td>
+                              <td>{{ d.customer }}</td>
+                              <td>{{ d.uom }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No item data found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!spData.by_invoice.length"><td colspan="7" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -493,45 +803,85 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ COST CENTER ═══════════════════════ -->
+    <!-- ═══════════════ COST CENTER ═══════════════ -->
     <div v-show="activeTab==='cost_center'" class="sd-body">
       <div class="sd-2col">
         <div class="sd-card full">
           <div class="sd-ch"><span class="sd-ct">Revenue by Cost Center</span><span class="sd-badge inv">Invoices</span></div>
-          <div :style="{position:'relative',height:Math.max(240,ccData.by_invoice.length*36+60)+'px'}">
-            <canvas id="ccSIChart" role="img" aria-label="Revenue by cost center invoices"></canvas>
-          </div>
+          <div :style="{position:'relative',height:Math.max(240,ccData.by_invoice.length*36+60)+'px'}"><canvas id="ccSIChart" role="img" aria-label="Revenue by cost center invoices"></canvas></div>
         </div>
         <div class="sd-card full">
           <div class="sd-ch"><span class="sd-ct">Order Value by Cost Center</span><span class="sd-badge ord">Orders</span></div>
-          <div :style="{position:'relative',height:Math.max(240,ccData.by_order.length*36+60)+'px'}">
-            <canvas id="ccSOChart" role="img" aria-label="Order value by cost center"></canvas>
-          </div>
+          <div :style="{position:'relative',height:Math.max(240,ccData.by_order.length*36+60)+'px'}"><canvas id="ccSOChart" role="img" aria-label="Order value by cost center"></canvas></div>
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">Cost Center Details</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['cc']" class="sd-search" placeholder="Filter cost centers…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Cost Center</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th>Collection %</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
+            <thead><tr>
+              <th>#</th>
+              <th @click="toggleSort('cc','cost_center')">Cost Center <span :class="['sd-sort',{on:sortIconActive('cc','cost_center')}]">{{ sortIcon('cc','cost_center') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('cc','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('cc','revenue')}]">{{ sortIcon('cc','revenue') }}</span></th>
+              <th class="sd-th-r">Collected (SI)</th>
+              <th>Collection %</th>
+              <th class="sd-th-r" @click="toggleSort('cc','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('cc','invoices')}]">{{ sortIcon('cc','invoices') }}</span></th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Orders</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="(row,i) in ccData.by_invoice" :key="row.cost_center">
-                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
-                <td><strong>{{ row.cost_center }}</strong></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td>
-                  <div style="display:flex;align-items:center;gap:6px">
-                    <div class="sd-sbw" style="width:60px">
-                      <div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div>
+              <template v-for="(row,i) in sortedRows('cc', ccData.by_invoice, ['revenue','collected','invoices'])" :key="row.cost_center">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('cc',row.cost_center)}"
+                    @click="toggleDrill('cc', row.cost_center, 'cost_center_customers', {cost_center: row.cost_center})">
+                  <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                  <td><strong>{{ row.cost_center }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('cc',row.cost_center)}">▾</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                  <td>
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <div class="sd-sbw" style="width:60px"><div class="sd-sbar" :style="{width:pct(row.collected,row.revenue)+'%',background:'#2E7D32'}"></div></div>
+                      <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
                     </div>
-                    <span style="font-size:11px;color:#757575">{{ pct(row.collected,row.revenue) }}%</span>
-                  </div>
-                </td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
-              </tr>
+                  </td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ (ccData.by_order.find(r=>r.cost_center===row.cost_center)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('cc', row.cost_center)" class="sd-drill">
+                  <td colspan="8" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.cost_center }} — customers &amp; sales persons</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Customer</th>
+                            <th class="sd-th-r">Revenue</th>
+                            <th class="sd-th-r">Invoices</th>
+                            <th>Sales Person</th>
+                            <th class="sd-th-r">Order Value</th>
+                            <th class="sd-th-r">Orders</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.customer">
+                              <td>{{ d.customer }}</td>
+                              <td class="sd-amt">{{ fmt(d.revenue) }}</td>
+                              <td class="sd-amt">{{ d.invoices }}</td>
+                              <td>{{ d.sales_person || '—' }}</td>
+                              <td class="sd-amt">{{ fmt(d.order_value) }}</td>
+                              <td class="sd-amt">{{ d.orders || '—' }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No data found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!ccData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -539,9 +889,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ NAMING SERIES ═══════════════════════ -->
+    <!-- ═══════════════ NAMING SERIES ═══════════════ -->
     <div v-show="activeTab==='naming_series'" class="sd-body">
-      <!-- info note -->
       <div class="sd-info-bar">
         <span>📋</span>
         <span>Naming series encodes your <strong>branch / location / year</strong> — e.g. <code>PTGB26</code> = Pranera Tirupur Garments B2B FY2026, <code>PFGB26</code> = Pranera Fashions Garments B2B.</span>
@@ -549,33 +898,73 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       <div class="sd-2col" style="margin-top:14px">
         <div class="sd-card full">
           <div class="sd-ch"><span class="sd-ct">Revenue by Naming Series</span><span class="sd-badge inv">Invoices</span></div>
-          <div :style="{position:'relative',height:Math.max(280,nsData.by_invoice.length*34+60)+'px'}">
-            <canvas id="nsSIChart" role="img" aria-label="Revenue by naming series invoices"></canvas>
-          </div>
+          <div :style="{position:'relative',height:Math.max(280,nsData.by_invoice.length*34+60)+'px'}"><canvas id="nsSIChart" role="img" aria-label="Revenue by naming series invoices"></canvas></div>
         </div>
         <div class="sd-card full">
           <div class="sd-ch"><span class="sd-ct">Order Value by Naming Series</span><span class="sd-badge ord">Orders</span></div>
-          <div :style="{position:'relative',height:Math.max(280,nsData.by_order.length*34+60)+'px'}">
-            <canvas id="nsSOChart" role="img" aria-label="Order value by naming series"></canvas>
-          </div>
+          <div :style="{position:'relative',height:Math.max(280,nsData.by_order.length*34+60)+'px'}"><canvas id="nsSOChart" role="img" aria-label="Order value by naming series"></canvas></div>
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch"><span class="sd-ct">Naming Series Details</span></div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['ns']" class="sd-search" placeholder="Filter series…"/>
+        </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>#</th><th>Naming Series</th><th>Prefix</th><th class="sd-th-r">Revenue (SI)</th><th class="sd-th-r">Collected (SI)</th><th class="sd-th-r">Invoices</th><th class="sd-th-r">Order Value (SO)</th><th class="sd-th-r">Orders</th></tr></thead>
+            <thead><tr>
+              <th>#</th>
+              <th @click="toggleSort('ns','naming_series')">Naming Series <span :class="['sd-sort',{on:sortIconActive('ns','naming_series')}]">{{ sortIcon('ns','naming_series') }}</span></th>
+              <th>Prefix</th>
+              <th class="sd-th-r" @click="toggleSort('ns','revenue')">Revenue (SI) <span :class="['sd-sort',{on:sortIconActive('ns','revenue')}]">{{ sortIcon('ns','revenue') }}</span></th>
+              <th class="sd-th-r">Collected (SI)</th>
+              <th class="sd-th-r" @click="toggleSort('ns','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('ns','invoices')}]">{{ sortIcon('ns','invoices') }}</span></th>
+              <th class="sd-th-r">Order Value (SO)</th>
+              <th class="sd-th-r">Orders</th>
+            </tr></thead>
             <tbody>
-              <tr v-for="(row,i) in nsData.by_invoice" :key="row.naming_series">
-                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
-                <td><code style="font-size:11px;background:#F5F5F5;padding:2px 6px;border-radius:4px">{{ row.naming_series }}</code></td>
-                <td><span class="sd-pill" style="background:#E3F2FD;color:#1565C0">{{ row.series_prefix }}</span></td>
-                <td class="sd-amt">{{ fmt(row.revenue) }}</td>
-                <td class="sd-amt">{{ fmt(row.collected) }}</td>
-                <td class="sd-amt">{{ row.invoices }}</td>
-                <td class="sd-amt">{{ fmt((nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).order_value) }}</td>
-                <td class="sd-amt">{{ (nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).orders || '—' }}</td>
-              </tr>
+              <template v-for="(row,i) in sortedRows('ns', nsData.by_invoice, ['revenue','collected','invoices'])" :key="row.naming_series">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('ns',row.naming_series)}"
+                    @click="toggleDrill('ns', row.naming_series, 'naming_series_docs', {naming_series: row.naming_series})">
+                  <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                  <td><code style="font-size:11px;background:#F5F5F5;padding:2px 6px;border-radius:4px">{{ row.naming_series }}</code> <span class="sd-chevron" :class="{open:isDrillOpen('ns',row.naming_series)}">▾</span></td>
+                  <td><span class="sd-pill" style="background:#E3F2FD;color:#1565C0">{{ row.series_prefix }}</span></td>
+                  <td class="sd-amt">{{ fmt(row.revenue) }}</td>
+                  <td class="sd-amt">{{ fmt(row.collected) }}</td>
+                  <td class="sd-amt">{{ row.invoices }}</td>
+                  <td class="sd-amt">{{ fmt((nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).order_value) }}</td>
+                  <td class="sd-amt">{{ (nsData.by_order.find(r=>r.naming_series===row.naming_series)||{}).orders || '—' }}</td>
+                </tr>
+                <tr v-if="isDrillOpen('ns', row.naming_series)" class="sd-drill">
+                  <td colspan="8" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ row.naming_series }} — recent documents</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Document ID</th>
+                            <th>Customer</th>
+                            <th>Date</th>
+                            <th class="sd-th-r">Amount</th>
+                            <th>Status</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.name">
+                              <td><a :href="'/app/sales-invoice/'+d.name" target="_blank" class="sd-link"><span class="sd-mono">{{ d.name }}</span></a></td>
+                              <td>{{ d.customer }}</td>
+                              <td>{{ fmtDate(d.date) }}</td>
+                              <td class="sd-amt">{{ fmt(d.grand_total) }}</td>
+                              <td><span class="sd-pill" :style="{background:siColor(d.status)+'22',color:siColor(d.status)}">{{ d.status }}</span></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No documents found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!nsData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
@@ -583,7 +972,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
     </div>
 
-    <!-- ═══════════════════════ TRANSACTIONS ═══════════════════════ -->
+    <!-- ═══════════════ TRANSACTIONS ═══════════════ -->
     <div v-show="activeTab==='transactions'" class="sd-body">
       <div class="sd-card">
         <div class="sd-ch">
@@ -592,18 +981,57 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
         <div class="sd-twrap">
           <table class="sd-table">
-            <thead><tr><th>ID</th><th>Type</th><th>Customer</th><th>Date</th><th class="sd-th-r">Amount</th><th>Status</th></tr></thead>
+            <thead><tr>
+              <th @click="toggleSort('transactions','name')">ID <span :class="['sd-sort',{on:sortIconActive('transactions','name')}]">{{ sortIcon('transactions','name') }}</span></th>
+              <th @click="toggleSort('transactions','type')">Type <span :class="['sd-sort',{on:sortIconActive('transactions','type')}]">{{ sortIcon('transactions','type') }}</span></th>
+              <th @click="toggleSort('transactions','customer')">Customer <span :class="['sd-sort',{on:sortIconActive('transactions','customer')}]">{{ sortIcon('transactions','customer') }}</span></th>
+              <th @click="toggleSort('transactions','date')">Date <span :class="['sd-sort',{on:sortIconActive('transactions','date')}]">{{ sortIcon('transactions','date') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('transactions','grand_total')">Amount <span :class="['sd-sort',{on:sortIconActive('transactions','grand_total')}]">{{ sortIcon('transactions','grand_total') }}</span></th>
+              <th @click="toggleSort('transactions','status')">Status <span :class="['sd-sort',{on:sortIconActive('transactions','status')}]">{{ sortIcon('transactions','status') }}</span></th>
+            </tr></thead>
             <tbody>
-              <tr v-for="tx in filteredTransactions" :key="tx.name">
-                <td><a :href="txLink(tx)" target="_blank" class="sd-link">{{ tx.name }}</a></td>
-                <td><span :class="['sd-tbadge',tx.type==='Invoice'?'inv':'ord']">{{ tx.type }}</span></td>
-                <td>{{ tx.customer }}</td>
-                <td>{{ fmtDate(tx.date) }}</td>
-                <td class="sd-amt">{{ fmt(tx.grand_total) }}</td>
-                <td>
-                  <span class="sd-pill" :style="{background:(tx.type==='Invoice'?siColor(tx.status):soColor(tx.status))+'22',color:tx.type==='Invoice'?siColor(tx.status):soColor(tx.status)}">{{ tx.status }}</span>
-                </td>
-              </tr>
+              <template v-for="tx in filteredTransactions" :key="tx.name">
+                <tr class="clickable" :class="{'drill-open':isDrillOpen('txn',tx.name)}"
+                    @click="toggleDrill('txn', tx.name, 'transaction_items', {doc_name: tx.name, doc_type: tx.type})">
+                  <td><a :href="txLink(tx)" target="_blank" class="sd-link" @click.stop>{{ tx.name }}</a> <span class="sd-chevron" :class="{open:isDrillOpen('txn',tx.name)}">▾</span></td>
+                  <td><span :class="['sd-tbadge',tx.type==='Invoice'?'inv':'ord']">{{ tx.type }}</span></td>
+                  <td>{{ tx.customer }}</td>
+                  <td>{{ fmtDate(tx.date) }}</td>
+                  <td class="sd-amt">{{ fmt(tx.grand_total) }}</td>
+                  <td><span class="sd-pill" :style="{background:(tx.type==='Invoice'?siColor(tx.status):soColor(tx.status))+'22',color:tx.type==='Invoice'?siColor(tx.status):soColor(tx.status)}">{{ tx.status }}</span></td>
+                </tr>
+                <tr v-if="isDrillOpen('txn', tx.name)" class="sd-drill">
+                  <td colspan="6" style="padding:0">
+                    <div class="sd-drill-inner">
+                      <div class="sd-drill-title">▸ {{ tx.name }} — line items</div>
+                      <div v-if="drill.loading" class="sd-drill-loading"><span class="sd-mini-spin"></span> Loading…</div>
+                      <template v-else-if="drill.rows.length">
+                        <table>
+                          <thead><tr>
+                            <th>Item Code</th>
+                            <th>Commercial Name</th>
+                            <th>UOM</th>
+                            <th class="sd-th-r">Qty</th>
+                            <th class="sd-th-r">Rate</th>
+                            <th class="sd-th-r">Amount</th>
+                          </tr></thead>
+                          <tbody>
+                            <tr v-for="d in drill.rows" :key="d.item_code+d.idx">
+                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
+                              <td>{{ cleanName(d.commercial_name || d.item_name) }}</td>
+                              <td>{{ d.uom }}</td>
+                              <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
+                              <td class="sd-amt">{{ fmt(d.rate) }}</td>
+                              <td class="sd-amt">{{ fmt(d.amount) }}</td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </template>
+                      <div v-else class="sd-drill-empty">No line items found.</div>
+                    </div>
+                  </td>
+                </tr>
+              </template>
               <tr v-if="!filteredTransactions.length"><td colspan="6" class="sd-empty">No transactions found.</td></tr>
             </tbody>
           </table>

@@ -10,8 +10,6 @@
   /* ── API: auto-detect desk vs www context ───────────────────── */
   function call(method, args) {
     const fullMethod = "dashboards.api.sales_api." + method;
-
-    // Desk context: frappe object is available
     if (window.frappe && frappe.call) {
       return new Promise((res, rej) => {
         frappe.call({
@@ -22,8 +20,6 @@
         });
       });
     }
-
-    // WWW / PWA context: plain fetch GET (no CSRF needed for whitelisted GET)
     const params = new URLSearchParams();
     for (const [k, v] of Object.entries(args || {})) {
       if (v !== null && v !== undefined && v !== "") params.set(k, String(v));
@@ -31,8 +27,7 @@
     const url = "/api/method/" + fullMethod +
       (params.toString() ? "?" + params.toString() : "");
     return fetch(url, {
-      method: "GET",
-      credentials: "same-origin",
+      method: "GET", credentials: "same-origin",
       headers: { "Accept": "application/json" },
     })
       .then(r => r.json())
@@ -46,16 +41,12 @@
     if (window.frappe && frappe.datetime) return frappe.datetime.get_today();
     return new Date().toISOString().split("T")[0];
   }
-
   function subMonths(dateStr, n) {
-    const d = new Date(dateStr);
-    d.setMonth(d.getMonth() - n);
+    const d = new Date(dateStr); d.setMonth(d.getMonth() - n);
     return d.toISOString().split("T")[0];
   }
-
   function subDays(dateStr, n) {
-    const d = new Date(dateStr);
-    d.setDate(d.getDate() - n);
+    const d = new Date(dateStr); d.setDate(d.getDate() - n);
     return d.toISOString().split("T")[0];
   }
 
@@ -88,7 +79,7 @@
     setup() {
       const today = todayStr();
       const DEFAULT_COMPANY = "Pranera Services and Solutions Pvt. Ltd.,";
-      const filters = ref({ from_date: subMonths(today, 1), to_date: today, company: "" });
+      const filters    = ref({ from_date: subMonths(today, 1), to_date: today, company: "" });
       const activeRange = ref("1M");
       const quickRanges = [
         { label: "1W", days: 7 }, { label: "1M", months: 1 },
@@ -99,6 +90,9 @@
       const companies = ref([]);
       const activeTab = ref("overview");
       const txSearch  = ref("");
+
+      /* ── drill-down state ───────────────────────────────────── */
+      const drill = ref({ rowKey: null, tab: null, loading: false, rows: [], type: null });
 
       const tabs = [
         { key: "overview",        icon: "📊", label: "Overview" },
@@ -114,8 +108,8 @@
       ];
 
       const empty = {
-        invoice: { total_invoiced: 0, total_collected: 0, total_outstanding: 0, collection_rate: 0, count: 0, status_breakdown: {} },
-        order:   { total_ordered: 0, count: 0, status_breakdown: {}, delivery_breakdown: {} },
+        invoice: { total_invoiced:0, total_collected:0, total_outstanding:0, collection_rate:0, count:0, status_breakdown:{} },
+        order:   { total_ordered:0, count:0, status_breakdown:{}, delivery_breakdown:{} },
       };
       const summary        = ref({ ...empty });
       const trend          = ref({ invoices: [], orders: [] });
@@ -128,12 +122,60 @@
       const nsData         = ref({ by_invoice: [], by_order: [] });
       const transactions   = ref([]);
 
+      /* ── sort state per table ───────────────────────────────── */
+      const tableSort = ref({});
+      const filterText = ref({});
+
+      function getSort(tableKey) {
+        return tableSort.value[tableKey] || { col: null, dir: "asc" };
+      }
+      function toggleSort(tableKey, col) {
+        const cur = getSort(tableKey);
+        if (cur.col === col) {
+          tableSort.value[tableKey] = { col, dir: cur.dir === "asc" ? "desc" : "asc" };
+        } else {
+          tableSort.value[tableKey] = { col, dir: "asc" };
+        }
+      }
+      function sortedRows(tableKey, rows, numericCols) {
+        const { col, dir } = getSort(tableKey);
+        const q = (filterText.value[tableKey] || "").toLowerCase();
+        let out = rows;
+        if (q) {
+          out = rows.filter(r => Object.values(r).some(v => String(v||"").toLowerCase().includes(q)));
+        }
+        if (!col) return out;
+        return [...out].sort((a, b) => {
+          const av = a[col], bv = b[col];
+          const isNum = numericCols && numericCols.includes(col);
+          let cmp = isNum ? (parseFloat(av)||0) - (parseFloat(bv)||0)
+                          : String(av||"").localeCompare(String(bv||""));
+          return dir === "asc" ? cmp : -cmp;
+        });
+      }
+      function sortIcon(tableKey, col) {
+        const { col: c, dir } = getSort(tableKey);
+        if (c !== col) return "⇅";
+        return dir === "asc" ? "↑" : "↓";
+      }
+      function sortIconActive(tableKey, col) {
+        return getSort(tableKey).col === col;
+      }
+
       const filteredTransactions = computed(() => {
-        if (!txSearch.value) return transactions.value;
+        const rows = transactions.value;
         const q = txSearch.value.toLowerCase();
-        return transactions.value.filter(t =>
-          (t.customer || "").toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q)
-        );
+        const filtered = q ? rows.filter(t =>
+          (t.customer||"").toLowerCase().includes(q) || (t.name||"").toLowerCase().includes(q)
+        ) : rows;
+        const { col, dir } = getSort("transactions");
+        if (!col) return filtered;
+        return [...filtered].sort((a,b) => {
+          const av = a[col], bv = b[col];
+          const num = ["grand_total"].includes(col);
+          const cmp = num ? (parseFloat(av)||0)-(parseFloat(bv)||0) : String(av||"").localeCompare(String(bv||""));
+          return dir==="asc"?cmp:-cmp;
+        });
       });
 
       /* ── formatters ─────────────────────────────────────────── */
@@ -151,7 +193,7 @@
       }
       function fmtDate(d) {
         if (!d) return "—";
-        try { return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); }
+        try { return new Date(d).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }); }
         catch { return d; }
       }
       function pct(val, total) { return total ? Math.round((val / total) * 100) : 0; }
@@ -173,9 +215,38 @@
         loadAll();
       }
 
+      /* ── drill-down logic ───────────────────────────────────── */
+      async function toggleDrill(tab, rowKey, drillType, args) {
+        if (drill.value.rowKey === rowKey && drill.value.tab === tab) {
+          drill.value = { rowKey: null, tab: null, loading: false, rows: [], type: null };
+          return;
+        }
+        drill.value = { rowKey, tab, loading: true, rows: [], type: drillType };
+        try {
+          const rows = await call("get_drill_down", {
+            drill_type: drillType,
+            ...args,
+            from_date: filters.value.from_date,
+            to_date:   filters.value.to_date,
+            company:   filters.value.company,
+          });
+          drill.value.rows = rows || [];
+        } catch(e) {
+          console.error("Drill-down error:", e);
+          drill.value.rows = [];
+        } finally {
+          drill.value.loading = false;
+        }
+      }
+
+      function isDrillOpen(tab, rowKey) {
+        return drill.value.tab === tab && drill.value.rowKey === rowKey;
+      }
+
       /* ── load data ──────────────────────────────────────────── */
       async function loadAll() {
         loading.value = true;
+        drill.value = { rowKey: null, tab: null, loading: false, rows: [], type: null };
         Object.keys(CH).forEach(kill);
         const a = {
           from_date: filters.value.from_date,
@@ -202,9 +273,8 @@
           uomData.value        = uom;
           stateData.value      = st;
           spData.value         = sp;
-          // Strip ' - PSS' suffix from cost center names
-          if (cc && cc.by_invoice) cc.by_invoice.forEach(r => { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
-          if (cc && cc.by_order)   cc.by_order.forEach(r =>   { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
+          if (cc && cc.by_invoice) cc.by_invoice.forEach(r => { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
+          if (cc && cc.by_order)   cc.by_order.forEach(r =>   { r.cost_center = (r.cost_center||"").replace(/ - PSS$/i,"").trim(); });
           ccData.value         = cc;
           nsData.value         = ns;
           transactions.value   = tx;
@@ -229,7 +299,6 @@
           if (companies.value.includes(DEFAULT_COMPANY)) {
             filters.value.company = DEFAULT_COMPANY;
           } else if (companies.value.length > 0) {
-            // Default not found — pick the first available company
             filters.value.company = companies.value[0];
           }
           await loadAll();
@@ -259,46 +328,44 @@
       function buildTrend() {
         const el = document.getElementById("trendChart"); if (!el) return;
         const siMap = {}, soMap = {};
-        (trend.value.invoices || []).forEach(r => siMap[r.month] = parseFloat(r.total) || 0);
-        (trend.value.orders   || []).forEach(r => soMap[r.month] = parseFloat(r.total) || 0);
-        const months = [...new Set([...Object.keys(siMap), ...Object.keys(soMap)])].sort();
+        (trend.value.invoices||[]).forEach(r => siMap[r.month] = parseFloat(r.total)||0);
+        (trend.value.orders  ||[]).forEach(r => soMap[r.month] = parseFloat(r.total)||0);
+        const months = [...new Set([...Object.keys(siMap),...Object.keys(soMap)])].sort();
         kill("trendChart");
         CH["trendChart"] = new Chart(el, {
           type: "bar",
           data: {
             labels: months.map(m => {
-              const [y, mo] = m.split("-");
-              return new Date(parseInt(y), parseInt(mo) - 1, 1)
-                .toLocaleDateString("en-IN", { month: "short", year: "2-digit" });
+              const [y,mo] = m.split("-");
+              return new Date(parseInt(y),parseInt(mo)-1,1).toLocaleDateString("en-IN",{month:"short",year:"2-digit"});
             }),
             datasets: [
-              { label: "Invoices", data: months.map(m => siMap[m] || 0), backgroundColor: "#1565C0cc", borderRadius: 4 },
-              { label: "Orders",   data: months.map(m => soMap[m] || 0), backgroundColor: "#0097A7cc", borderRadius: 4 },
+              { label:"Invoices", data:months.map(m=>siMap[m]||0), backgroundColor:"#1565C0cc", borderRadius:4 },
+              { label:"Orders",   data:months.map(m=>soMap[m]||0), backgroundColor:"#0097A7cc", borderRadius:4 },
             ],
           },
           options: {
-            responsive: true, maintainAspectRatio: false,
+            responsive:true, maintainAspectRatio:false,
             plugins: {
-              legend: { display: false },
-              tooltip: { callbacks: { label: c => " ₹" + (c.parsed.y || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } },
-              datalabels: {
-                anchor: "end", align: "top", offset: 6,
-                font: { size: 10, weight: "700" }, color: "#111",
-                backgroundColor: "rgba(255,255,255,0.9)",
-                borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
-                borderColor: "#ccc", borderWidth: 1,
-                formatter: function(v) {
-                  var n = parseFloat(v) || 0;
-                  if (n === 0) return "";
-                  if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
-                  if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
-                  return "Rs." + Math.round(n).toLocaleString("en-IN");
+              legend:{display:false},
+              tooltip:{callbacks:{label:c=>" ₹"+(c.parsed.y||0).toLocaleString("en-IN",{maximumFractionDigits:0})}},
+              datalabels:{
+                anchor:"end",align:"top",offset:6,
+                font:{size:10,weight:"700"},color:"#111",
+                backgroundColor:"rgba(255,255,255,0.9)",
+                borderRadius:4,padding:{top:2,bottom:2,left:5,right:5},
+                borderColor:"#ccc",borderWidth:1,
+                formatter:function(v){
+                  var n=parseFloat(v)||0; if(n===0)return"";
+                  if(n>=1e7)return"Rs."+(n/1e7).toFixed(2)+"Cr";
+                  if(n>=1e5)return"Rs."+(n/1e5).toFixed(2)+"L";
+                  return"Rs."+Math.round(n).toLocaleString("en-IN");
                 },
               },
             },
-            scales: {
-              x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-              y: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 11 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
+            scales:{
+              x:{grid:{display:false},ticks:{font:{size:11}}},
+              y:{grid:{color:"#f0f0f0"},ticks:{font:{size:11},callback:v=>"₹"+(v>=1e5?(v/1e5).toFixed(1)+"L":v.toLocaleString())}},
             },
           },
         });
@@ -306,25 +373,24 @@
 
       function buildDonut(id, breakdown, colorFn) {
         const el = document.getElementById(id); if (!el) return;
-        const keys = Object.keys(breakdown || {}); if (!keys.length) return;
+        const keys = Object.keys(breakdown||{}); if (!keys.length) return;
         kill(id);
         CH[id] = new Chart(el, {
-          type: "doughnut",
-          data: { labels: keys, datasets: [{ data: keys.map(k => breakdown[k]), backgroundColor: keys.map(colorFn), borderWidth: 2, borderColor: "#fff" }] },
-          options: {
-            responsive: true, maintainAspectRatio: false, cutout: "55%",
-            plugins: {
-              legend: { display: false },
-              datalabels: {
-                display: true,
-                anchor: "center", align: "center",
-                font: { size: 12, weight: "700" }, color: "#fff",
-                textStrokeColor: "rgba(0,0,0,0.6)", textStrokeWidth: 3,
-                formatter: function(value, ctx) {
-                  var total = ctx.dataset.data.reduce(function(a,b){ return a+b; }, 0);
-                  var pct = total ? Math.round(value / total * 100) : 0;
-                  if (pct < 3) return "";
-                  return value + " (" + pct + "%)";
+          type:"doughnut",
+          data:{labels:keys,datasets:[{data:keys.map(k=>breakdown[k]),backgroundColor:keys.map(colorFn),borderWidth:2,borderColor:"#fff"}]},
+          options:{
+            responsive:true,maintainAspectRatio:false,cutout:"55%",
+            plugins:{
+              legend:{display:false},
+              datalabels:{
+                display:true,anchor:"center",align:"center",
+                font:{size:12,weight:"700"},color:"#fff",
+                textStrokeColor:"rgba(0,0,0,0.6)",textStrokeWidth:3,
+                formatter:function(value,ctx){
+                  var total=ctx.dataset.data.reduce(function(a,b){return a+b;},0);
+                  var p=total?Math.round(value/total*100):0;
+                  if(p<3)return"";
+                  return value+" ("+p+"%)";
                 },
               },
             },
@@ -332,88 +398,84 @@
         });
       }
 
-      function buildHBar(id, data, valueKey, color, labelKey, cleanLabel = false) {
-        const el = document.getElementById(id); if (!el || !data || !data.length) return;
-        const top = data.slice(0, 10);
-        const labels = top.map(r => {
-          let n = r[labelKey] || "Unknown";
-          if (cleanLabel) n = cleanName(n);
-          return n.length > 22 ? n.substring(0, 22) + "…" : n;
+      function buildHBar(id, data, valueKey, color, labelKey, cleanLabel=false) {
+        const el = document.getElementById(id); if (!el||!data||!data.length) return;
+        const top = data.slice(0,10);
+        const labels = top.map(r=>{
+          let n=r[labelKey]||"Unknown";
+          if(cleanLabel) n=cleanName(n);
+          return n.length>22?n.substring(0,22)+"…":n;
         });
         kill(id);
         CH[id] = new Chart(el, {
-          type: "bar",
-          data: { labels, datasets: [{ label: "Value", data: top.map(r => parseFloat(r[valueKey]) || 0), backgroundColor: color + "cc", borderRadius: 4 }] },
-          options: {
-            indexAxis: "y", responsive: true, maintainAspectRatio: false,
-            plugins: {
-              legend: { display: false },
-              tooltip: { callbacks: { label: c => " ₹" + (c.parsed.x || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 }) } },
-              datalabels: {
-                anchor: "end", align: "right", offset: 6,
-                font: { size: 10, weight: "700" }, color: "#111",
-                backgroundColor: "rgba(255,255,255,0.9)",
-                borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
-                borderColor: "#ccc", borderWidth: 1, clip: false,
-                formatter: function(v) {
-                  var n = parseFloat(v) || 0;
-                  if (n === 0) return "";
-                  if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
-                  if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
-                  return "Rs." + Math.round(n).toLocaleString("en-IN");
+          type:"bar",
+          data:{labels,datasets:[{label:"Value",data:top.map(r=>parseFloat(r[valueKey])||0),backgroundColor:color+"cc",borderRadius:4}]},
+          options:{
+            indexAxis:"y",responsive:true,maintainAspectRatio:false,
+            plugins:{
+              legend:{display:false},
+              tooltip:{callbacks:{label:c=>" ₹"+(c.parsed.x||0).toLocaleString("en-IN",{maximumFractionDigits:0})}},
+              datalabels:{
+                anchor:"end",align:"right",offset:6,
+                font:{size:10,weight:"700"},color:"#111",
+                backgroundColor:"rgba(255,255,255,0.9)",
+                borderRadius:4,padding:{top:2,bottom:2,left:5,right:5},
+                borderColor:"#ccc",borderWidth:1,clip:false,
+                formatter:function(v){
+                  var n=parseFloat(v)||0; if(n===0)return"";
+                  if(n>=1e7)return"Rs."+(n/1e7).toFixed(2)+"Cr";
+                  if(n>=1e5)return"Rs."+(n/1e5).toFixed(2)+"L";
+                  return"Rs."+Math.round(n).toLocaleString("en-IN");
                 },
               },
             },
-            scales: {
-              x: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 10 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
-              y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            scales:{
+              x:{grid:{color:"#f0f0f0"},ticks:{font:{size:10},callback:v=>"₹"+(v>=1e5?(v/1e5).toFixed(1)+"L":v.toLocaleString())}},
+              y:{grid:{display:false},ticks:{font:{size:11}}},
             },
-            layout: { padding: { right: 70 } },
+            layout:{padding:{right:70}},
           },
         });
       }
 
       function buildUOMCharts() {
-        const build = (id, rows, valueKey, color) => {
-          const el = document.getElementById(id); if (!el || !rows.length) return;
+        const build = (id,rows,valueKey,color)=>{
+          const el=document.getElementById(id); if(!el||!rows.length)return;
           kill(id);
-          CH[id] = new Chart(el, {
-            type: "bar",
-            data: { labels: rows.map(r => r.uom || "N/A"), datasets: [{ label: "Value", data: rows.map(r => parseFloat(r[valueKey]) || 0), backgroundColor: color + "cc", borderRadius: 4 }] },
-            options: {
-              responsive: true, maintainAspectRatio: false,
-              plugins: {
-                legend: { display: false },
-                datalabels: {
-                  anchor: "end", align: "top", offset: 6,
-                  font: { size: 10, weight: "700" }, color: "#111",
-                  backgroundColor: "rgba(255,255,255,0.9)",
-                  borderRadius: 4, padding: { top: 2, bottom: 2, left: 5, right: 5 },
-                  borderColor: "#ccc", borderWidth: 1,
-                  formatter: function(v) {
-                    var n = parseFloat(v) || 0;
-                    if (n === 0) return "";
-                    if (n >= 1e7) return "Rs." + (n/1e7).toFixed(2) + "Cr";
-                    if (n >= 1e5) return "Rs." + (n/1e5).toFixed(2) + "L";
-                    return "Rs." + Math.round(n).toLocaleString("en-IN");
+          CH[id]=new Chart(el,{
+            type:"bar",
+            data:{labels:rows.map(r=>r.uom||"N/A"),datasets:[{label:"Value",data:rows.map(r=>parseFloat(r[valueKey])||0),backgroundColor:color+"cc",borderRadius:4}]},
+            options:{
+              responsive:true,maintainAspectRatio:false,
+              plugins:{
+                legend:{display:false},
+                datalabels:{
+                  anchor:"end",align:"top",offset:6,
+                  font:{size:10,weight:"700"},color:"#111",
+                  backgroundColor:"rgba(255,255,255,0.9)",
+                  borderRadius:4,padding:{top:2,bottom:2,left:5,right:5},
+                  borderColor:"#ccc",borderWidth:1,
+                  formatter:function(v){
+                    var n=parseFloat(v)||0; if(n===0)return"";
+                    if(n>=1e7)return"Rs."+(n/1e7).toFixed(2)+"Cr";
+                    if(n>=1e5)return"Rs."+(n/1e5).toFixed(2)+"L";
+                    return"Rs."+Math.round(n).toLocaleString("en-IN");
                   },
                 },
               },
-              scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                y: { grid: { color: "#f0f0f0" }, ticks: { font: { size: 10 }, callback: v => "₹" + (v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v.toLocaleString()) } },
+              scales:{
+                x:{grid:{display:false},ticks:{font:{size:11}}},
+                y:{grid:{color:"#f0f0f0"},ticks:{font:{size:10},callback:v=>"₹"+(v>=1e5?(v/1e5).toFixed(1)+"L":v.toLocaleString())}},
               },
-              layout: { padding: { top: 20 } },
+              layout:{padding:{top:20}},
             },
           });
         };
-        build("uomSIChart", (uomData.value.by_invoice || []).slice(0, 10), "revenue",     "#1565C0");
-        build("uomSOChart", (uomData.value.by_order   || []).slice(0, 10), "order_value", "#0097A7");
+        build("uomSIChart",(uomData.value.by_invoice||[]).slice(0,10),"revenue",    "#1565C0");
+        build("uomSOChart",(uomData.value.by_order  ||[]).slice(0,10),"order_value","#0097A7");
       }
 
-      onMounted(async () => {
-        await loadFilterOptions();
-      });
+      onMounted(async () => { await loadFilterOptions(); });
 
       return {
         filters, activeRange, quickRanges, loading, companies,
@@ -421,6 +483,8 @@
         summary, trend, topCustomers,
         commercialName, uomData, stateData, spData, ccData, nsData, transactions,
         filteredTransactions,
+        drill, isDrillOpen, toggleDrill,
+        tableSort, filterText, getSort, toggleSort, sortedRows, sortIcon, sortIconActive,
         fmt, fmtQty, fmtDate, pct, txLink, cleanName,
         applyRange, loadAll,
         siColor, soColor, delColor,
