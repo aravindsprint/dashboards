@@ -30,8 +30,11 @@ def get_config():
 
 @frappe.whitelist()
 def save_config(config=None):
-    if isinstance(config, str):
-        config = json.loads(config)
+    try:
+        if isinstance(config, str):
+            config = json.loads(config)
+    except Exception as e:
+        frappe.throw(f"Invalid config JSON: {e}")
     _set_cache(CACHE_KEY_CONFIG, config or {})
     return {"success": True}
 
@@ -319,9 +322,12 @@ def _send_single(phone, summary, cfg):
 
 @frappe.whitelist()
 def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="manual"):
-    if isinstance(recipients, str): recipients = json.loads(recipients)
-    if isinstance(summary, str):    summary    = json.loads(summary)
-    if isinstance(config, str):     config     = json.loads(config)
+    try:
+        if isinstance(recipients, str): recipients = json.loads(recipients)
+        if isinstance(summary, str):    summary    = json.loads(summary)
+        if isinstance(config, str):     config     = json.loads(config)
+    except Exception as e:
+        frappe.throw(f"Invalid JSON parameter: {e}")
 
     recipients = recipients or []
     summary    = summary    or {}

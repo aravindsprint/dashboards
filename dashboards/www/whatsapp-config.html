@@ -445,17 +445,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
   }
 
   function postApi(method, body) {
-    const csrf = window.csrf_token || '';
+    const csrf = window.csrf_token || document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
+    // Frappe whitelist expects form-encoded; nested objects must be JSON strings
+    const form = new URLSearchParams();
+    for (const [k, v] of Object.entries(body || {})) {
+      form.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+    }
     return fetch('/api/method/dashboards.api.whatsapp_api.' + method, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
         'Accept': 'application/json',
         'X-Frappe-CSRF-Token': csrf,
+        'X-Requested-With': 'XMLHttpRequest',
       },
-      body: JSON.stringify(body)
-    }).then(r=>r.json()).then(r=>{
+      body: form.toString()
+    }).then(r => {
+      if (!r.ok) return r.json().then(e => { throw new Error(e.exc_type || e._server_messages || `HTTP ${r.status}`); });
+      return r.json();
+    }).then(r => {
       if (r.message !== undefined) return r.message;
       throw new Error(r.exc || 'API error');
     });
@@ -610,18 +619,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           const summary = await callApi('get_summary_for_whatsapp', { days: sendNowRange.value, company: config.value.company });
           log(`✓ Summary fetched: ₹${summary.total_invoiced_fmt} invoiced`, '');
 
-          log(`▸ Sending to ${recipients.length} recipient(s) via Node server…`, 'info');
+          log(`▸ Sending to ${recipients.length} recipient(s)…`, 'info');
           const result = await postApi('send_whatsapp_report', {
             recipients,
             summary,
             config: {
-              nodeServerUrl: config.value.nodeServerUrl,
-              token: config.value.token,
-              phoneId: config.value.phoneId,
+              token:        config.value.token,
+              phoneId:      config.value.phoneId,
               templateName: config.value.templateName,
               languageCode: config.value.languageCode,
-              apiVersion: config.value.apiVersion,
-              messageFooter: config.value.messageFooter,
+              apiVersion:   config.value.apiVersion,
+              messageFooter:config.value.messageFooter,
             },
             trigger: 'manual',
           });
