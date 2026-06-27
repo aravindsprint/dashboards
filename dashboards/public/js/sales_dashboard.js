@@ -91,38 +91,38 @@
       const activeTab = ref("overview");
       const txSearch  = ref("");
 
-      /* ── drill-down state (multi-row) ───────────────────────── */
-      // drillState[tabKey][rowKey] = { loading, rows }
-      const drillState = ref({});
+      /* ── drill-down state (multi-row, reactive Map) ────────── */
+      // Use flat reactive refs: openKeys = Set of "tab::rowKey" strings
+      // rowData[tab::rowKey] = { loading, rows }
+      const _drillMap = ref({});  // "tab::rowKey" → { loading, rows }
+
+      function _dk(tab, rowKey) { return tab + '::' + String(rowKey); }
 
       function isDrillOpen(tab, rowKey) {
-        return !!(drillState.value[tab] && drillState.value[tab][rowKey]);
+        return !!_drillMap.value[_dk(tab, rowKey)];
       }
 
       function getDrillRows(tab, rowKey) {
-        return (drillState.value[tab] && drillState.value[tab][rowKey])
-          ? drillState.value[tab][rowKey].rows : [];
+        const d = _drillMap.value[_dk(tab, rowKey)];
+        return d ? d.rows : [];
       }
 
       function isDrillLoading(tab, rowKey) {
-        return !!(drillState.value[tab] && drillState.value[tab][rowKey] &&
-                  drillState.value[tab][rowKey].loading);
+        const d = _drillMap.value[_dk(tab, rowKey)];
+        return !!(d && d.loading);
       }
 
       async function toggleDrill(tab, rowKey, drillType, args) {
-        if (!drillState.value[tab]) drillState.value[tab] = {};
-        // If already open → close it
-        if (drillState.value[tab][rowKey]) {
-          const updated = { ...drillState.value[tab] };
-          delete updated[rowKey];
-          drillState.value = { ...drillState.value, [tab]: updated };
+        const key = _dk(tab, rowKey);
+        if (_drillMap.value[key]) {
+          // Close it
+          const m = { ..._drillMap.value };
+          delete m[key];
+          _drillMap.value = m;
           return;
         }
-        // Open and load
-        drillState.value = {
-          ...drillState.value,
-          [tab]: { ...drillState.value[tab], [rowKey]: { loading: true, rows: [] } }
-        };
+        // Open with loading
+        _drillMap.value = { ..._drillMap.value, [key]: { loading: true, rows: [] } };
         try {
           const rows = await call("get_drill_down", {
             drill_type: drillType, ...args,
@@ -130,33 +130,30 @@
             to_date:   filters.value.to_date,
             company:   filters.value.company,
           });
-          drillState.value = {
-            ...drillState.value,
-            [tab]: { ...drillState.value[tab], [rowKey]: { loading: false, rows: rows || [] } }
-          };
+          _drillMap.value = { ..._drillMap.value, [key]: { loading: false, rows: rows || [] } };
         } catch(e) {
-          drillState.value = {
-            ...drillState.value,
-            [tab]: { ...drillState.value[tab], [rowKey]: { loading: false, rows: [] } }
-          };
+          _drillMap.value = { ..._drillMap.value, [key]: { loading: false, rows: [] } };
         }
       }
 
       async function expandAll(tabKey, rows, drillType, keyField, argsBuilder) {
         for (const row of rows) {
-          const key = row[keyField];
-          if (!isDrillOpen(tabKey, key)) {
-            await toggleDrill(tabKey, key, drillType, argsBuilder(row));
+          const rk = row[keyField];
+          if (!isDrillOpen(tabKey, rk)) {
+            await toggleDrill(tabKey, rk, drillType, argsBuilder(row));
           }
         }
       }
 
       function collapseAll(tabKey) {
-        drillState.value = { ...drillState.value, [tabKey]: {} };
+        const m = { ..._drillMap.value };
+        Object.keys(m).forEach(k => { if (k.startsWith(tabKey + '::')) delete m[k]; });
+        _drillMap.value = m;
       }
 
-      // Keep drill ref for backward compat (unused now)
+      // backward compat ref (not used for rendering)
       const drill = ref({ rowKey: null, tab: null, loading: false, rows: [], type: null });
+      const drillState = _drillMap;
 
       const tabs = [
         { key: "overview",        icon: "📊", label: "Overview" },
