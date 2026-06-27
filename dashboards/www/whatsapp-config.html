@@ -189,10 +189,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           <input v-model="config.languageCode" placeholder="en"/>
         </div>
       </div>
-      <div class="fg">
-        <label>Node Server URL</label>
-        <input v-model="config.nodeServerUrl" placeholder="http://localhost:3090"/>
-      </div>
+
       <div class="fg" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:0">
         <input type="checkbox" v-model="config.enabled" id="sched-on" style="width:16px;height:16px;cursor:pointer"/>
         <label for="sched-on" style="text-transform:none;font-size:13px;cursor:pointer;letter-spacing:0">Enable scheduled sending</label>
@@ -531,7 +528,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         templateName: 'sales_summary',
         apiVersion: 'v22.0',
         languageCode: 'en',
-        nodeServerUrl: 'http://localhost:3090',
+
         enabled: false,
         scheduleDays: ['mon','tue','wed','thu','fri'],
         scheduleTimes: ['09:00','18:00'],
