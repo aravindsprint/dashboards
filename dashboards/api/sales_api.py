@@ -816,3 +816,302 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             """, [doc_name], as_dict=True)
 
     return []
+# ── APPEND THIS ENTIRE BLOCK TO THE END OF sales_api.py ──────────────────────
+
+
+@frappe.whitelist()
+def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
+                   customer=None, state=None, cost_center=None,
+                   sales_person=None, commercial_name=None, uom=None,
+                   naming_series=None, doc_name=None, doc_type=None):
+    """
+    Single drill-down endpoint for all dashboard tables.
+
+    drill_type values:
+      customer_items          → SI line items (item_code, commercial_name, uom, qty, revenue, sales_person)
+      customer_order_items    → SO line items for a customer
+      commercial_name_detail  → SI: item codes + customers for a commercial name
+      uom_items               → SI: item codes for a UOM
+      state_customers         → SI+SO: customers in a state
+      salesperson_items       → SI: items sold by a sales person
+      cost_center_customers   → SI+SO: customers under a cost center
+      naming_series_docs      → SI: recent docs for a naming series
+      transaction_items       → line items for a specific SI or SO document
+    """
+    from_date, to_date = _date_args(from_date, to_date)
+    cf    = _cf(company)
+    cf_so = cf.replace("si.company", "so.company")
+    p     = [from_date, to_date] + ([company] if company else [])
+
+    # Detect commercial_name column for this installation
+    si_cn = _commercial_name_col("tabSales Invoice Item") or "item_name"
+    so_cn = _commercial_name_col("tabSales Order Item")   or "item_name"
+
+    # ── 1. Customer → SI line items (item code, commercial name, sales person) ─
+    if drill_type == "customer_items":
+        return frappe.db.sql(f"""
+            SELECT
+                sii.item_code,
+                sii.item_name,
+                sii.{si_cn}               AS commercial_name,
+                sii.uom,
+                SUM(sii.qty)              AS qty,
+                SUM(sii.amount)           AS revenue,
+                MAX(st.sales_person_name) AS sales_person
+            FROM `tabSales Invoice Item` sii
+            JOIN `tabSales Invoice` si ON si.name = sii.parent
+            LEFT JOIN `tabSales Team` st
+                ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND si.customer = %s
+              {cf}
+            GROUP BY sii.item_code, sii.uom
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [customer], as_dict=True)
+
+    # ── 2. Customer → SO line items ────────────────────────────────────────────
+    if drill_type == "customer_order_items":
+        return frappe.db.sql(f"""
+            SELECT
+                soi.item_code,
+                soi.item_name,
+                soi.{so_cn}               AS commercial_name,
+                soi.uom,
+                SUM(soi.qty)              AS qty,
+                SUM(soi.amount)           AS order_value,
+                MAX(st.sales_person_name) AS sales_person
+            FROM `tabSales Order Item` soi
+            JOIN `tabSales Order` so ON so.name = soi.parent
+            LEFT JOIN `tabSales Team` st
+                ON st.parent = so.name AND st.parenttype = 'Sales Order'
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND so.customer = %s
+              {cf_so}
+            GROUP BY soi.item_code, soi.uom
+            ORDER BY order_value DESC
+            LIMIT 20
+        """, p + [customer], as_dict=True)
+
+    # ── 3. Commercial name → item codes + customers ────────────────────────────
+    if drill_type == "commercial_name_detail":
+        return frappe.db.sql(f"""
+            SELECT
+                sii.item_code,
+                sii.item_name,
+                sii.{si_cn}               AS commercial_name,
+                sii.uom,
+                si.customer,
+                SUM(sii.qty)              AS qty,
+                SUM(sii.amount)           AS revenue,
+                MAX(st.sales_person_name) AS sales_person
+            FROM `tabSales Invoice Item` sii
+            JOIN `tabSales Invoice` si ON si.name = sii.parent
+            LEFT JOIN `tabSales Team` st
+                ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND sii.{si_cn} = %s
+              {cf}
+            GROUP BY sii.item_code, si.customer
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [commercial_name], as_dict=True)
+
+    # ── 4. UOM → item codes ────────────────────────────────────────────────────
+    if drill_type == "uom_items":
+        return frappe.db.sql(f"""
+            SELECT
+                sii.item_code,
+                sii.item_name,
+                sii.{si_cn}  AS commercial_name,
+                SUM(sii.qty) AS qty,
+                SUM(sii.amount) AS revenue
+            FROM `tabSales Invoice Item` sii
+            JOIN `tabSales Invoice` si ON si.name = sii.parent
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND sii.uom = %s
+              {cf}
+            GROUP BY sii.item_code
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [uom], as_dict=True)
+
+    # ── 5. State → customers ───────────────────────────────────────────────────
+    if drill_type == "state_customers":
+        # Try customer-level state field first, fall back to address
+        si_rows = frappe.db.sql(f"""
+            SELECT
+                si.customer,
+                SUM(si.grand_total)        AS revenue,
+                COUNT(si.name)             AS invoices,
+                SUM(si.outstanding_amount) AS outstanding
+            FROM `tabSales Invoice` si
+            JOIN `tabCustomer` c ON c.name = si.customer
+            LEFT JOIN `tabDynamic Link` dl
+                ON dl.link_doctype = 'Customer'
+                AND dl.link_name = c.name
+                AND dl.parenttype = 'Address'
+            LEFT JOIN `tabAddress` addr ON addr.name = dl.parent AND addr.is_primary_address = 1
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND COALESCE(addr.state, '') = %s
+              {cf}
+            GROUP BY si.customer
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [state], as_dict=True)
+
+        so_rows = frappe.db.sql(f"""
+            SELECT
+                so.customer,
+                SUM(so.grand_total) AS order_value,
+                COUNT(so.name)      AS orders
+            FROM `tabSales Order` so
+            JOIN `tabCustomer` c ON c.name = so.customer
+            LEFT JOIN `tabDynamic Link` dl
+                ON dl.link_doctype = 'Customer'
+                AND dl.link_name = c.name
+                AND dl.parenttype = 'Address'
+            LEFT JOIN `tabAddress` addr ON addr.name = dl.parent AND addr.is_primary_address = 1
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND COALESCE(addr.state, '') = %s
+              {cf_so}
+            GROUP BY so.customer
+            ORDER BY order_value DESC
+            LIMIT 20
+        """, p + [state], as_dict=True)
+
+        so_map = {r.customer: r for r in so_rows}
+        for r in si_rows:
+            so = so_map.get(r.customer, {})
+            r["order_value"] = so.get("order_value", 0)
+            r["orders"]      = so.get("orders", 0)
+        return si_rows
+
+    # ── 6. Sales person → items sold ──────────────────────────────────────────
+    if drill_type == "salesperson_items":
+        return frappe.db.sql(f"""
+            SELECT
+                sii.item_code,
+                sii.item_name,
+                sii.{si_cn}    AS commercial_name,
+                si.customer,
+                sii.uom,
+                SUM(sii.qty)   AS qty,
+                SUM(sii.amount) AS revenue
+            FROM `tabSales Invoice Item` sii
+            JOIN `tabSales Invoice` si ON si.name = sii.parent
+            JOIN `tabSales Team` st
+                ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND st.sales_person_name = %s
+              {cf}
+            GROUP BY sii.item_code, si.customer
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [sales_person], as_dict=True)
+
+    # ── 7. Cost center → customers + sales persons ─────────────────────────────
+    if drill_type == "cost_center_customers":
+        cc_val = (cost_center or "").strip()
+        # Match both with and without " - PSS" suffix
+        cc_like = f"%{cc_val}%"
+
+        si_rows = frappe.db.sql(f"""
+            SELECT
+                si.customer,
+                SUM(si.grand_total)        AS revenue,
+                COUNT(si.name)             AS invoices,
+                MAX(st.sales_person_name)  AS sales_person
+            FROM `tabSales Invoice` si
+            LEFT JOIN `tabSales Team` st
+                ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
+            WHERE si.docstatus = 1
+              AND si.posting_date BETWEEN %s AND %s
+              AND si.cost_center LIKE %s
+              {cf}
+            GROUP BY si.customer
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p + [cc_like], as_dict=True)
+
+        so_rows = frappe.db.sql(f"""
+            SELECT
+                so.customer,
+                SUM(so.grand_total) AS order_value,
+                COUNT(so.name)      AS orders
+            FROM `tabSales Order` so
+            WHERE so.docstatus = 1
+              AND so.transaction_date BETWEEN %s AND %s
+              AND so.cost_center LIKE %s
+              {cf_so}
+            GROUP BY so.customer
+            ORDER BY order_value DESC
+            LIMIT 20
+        """, p + [cc_like], as_dict=True)
+
+        so_map = {r.customer: r for r in so_rows}
+        for r in si_rows:
+            so = so_map.get(r.customer, {})
+            r["order_value"] = so.get("order_value", 0)
+            r["orders"]      = so.get("orders", 0)
+        return si_rows
+
+    # ── 8. Naming series → recent documents ───────────────────────────────────
+    if drill_type == "naming_series_docs":
+        return frappe.db.sql(f"""
+            SELECT
+                name,
+                customer,
+                posting_date AS date,
+                grand_total,
+                status
+            FROM `tabSales Invoice`
+            WHERE docstatus = 1
+              AND posting_date BETWEEN %s AND %s
+              AND naming_series = %s
+              {cf}
+            ORDER BY posting_date DESC
+            LIMIT 20
+        """, p + [naming_series], as_dict=True)
+
+    # ── 9. Transaction → line items (SI or SO) ─────────────────────────────────
+    if drill_type == "transaction_items":
+        if doc_type == "Invoice":
+            return frappe.db.sql(f"""
+                SELECT
+                    sii.idx,
+                    sii.item_code,
+                    sii.item_name,
+                    sii.{si_cn} AS commercial_name,
+                    sii.uom,
+                    sii.qty,
+                    sii.rate,
+                    sii.amount
+                FROM `tabSales Invoice Item` sii
+                WHERE sii.parent = %s
+                ORDER BY sii.idx
+            """, [doc_name], as_dict=True)
+        else:
+            return frappe.db.sql(f"""
+                SELECT
+                    soi.idx,
+                    soi.item_code,
+                    soi.item_name,
+                    soi.{so_cn} AS commercial_name,
+                    soi.uom,
+                    soi.qty,
+                    soi.rate,
+                    soi.amount
+                FROM `tabSales Order Item` soi
+                WHERE soi.parent = %s
+                ORDER BY soi.idx
+            """, [doc_name], as_dict=True)
+
+    return []
