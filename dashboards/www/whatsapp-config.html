@@ -432,39 +432,86 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
   const WA_API_BASE = '/api/method/dashboards.api.whatsapp_api.';
 
   function callApi(method, args) {
-    const params = new URLSearchParams();
-    for (const [k,v] of Object.entries(args||{})) {
-      if (v !== null && v !== undefined) params.set(k, typeof v==='object'?JSON.stringify(v):String(v));
+    const fullMethod = 'dashboards.api.whatsapp_api.' + method;
+
+    // Use frappe.call when inside Frappe Desk
+    if (window.frappe && frappe.call) {
+      return new Promise((res, rej) => {
+        frappe.call({
+          method: fullMethod,
+          args: args || {},
+          callback: r => r && r.message !== undefined ? res(r.message) : rej(r),
+          error: rej,
+        });
+      });
     }
-    return fetch('/api/method/dashboards.api.whatsapp_api.' + method + (params.toString()? '?'+params:''), {
-      credentials: 'same-origin', headers: { Accept: 'application/json' }
-    }).then(r=>r.json()).then(r=>{
+
+    // WWW page — plain fetch GET
+    const params = new URLSearchParams();
+    for (const [k, v] of Object.entries(args || {})) {
+      if (v !== null && v !== undefined && v !== '')
+        params.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+    }
+    return fetch('/api/method/' + fullMethod + (params.toString() ? '?' + params : ''), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    }).then(r => r.json()).then(r => {
       if (r.message !== undefined) return r.message;
       throw new Error(r.exc || 'API error');
     });
   }
 
   function postApi(method, body) {
-    const csrf = window.csrf_token || document.cookie.match(/csrf_token=([^;]+)/)?.[1] || '';
-    // Frappe whitelist expects form-encoded; nested objects must be JSON strings
-    const form = new URLSearchParams();
+    const fullMethod = 'dashboards.api.whatsapp_api.' + method;
+
+    // Serialise nested objects to JSON strings (Frappe whitelist requirement)
+    const serialised = {};
     for (const [k, v] of Object.entries(body || {})) {
-      form.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+      serialised[k] = typeof v === 'object' ? JSON.stringify(v) : v;
     }
-    return fetch('/api/method/dashboards.api.whatsapp_api.' + method, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json',
-        'X-Frappe-CSRF-Token': csrf,
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: form.toString()
-    }).then(r => {
-      if (!r.ok) return r.json().then(e => { throw new Error(e.exc_type || e._server_messages || `HTTP ${r.status}`); });
+
+    // Use frappe.call when inside Frappe Desk (has CSRF baked in)
+    if (window.frappe && frappe.call) {
+      return new Promise((res, rej) => {
+        frappe.call({
+          method: fullMethod,
+          args: serialised,
+          callback: r => r && r.message !== undefined ? res(r.message) : rej(r),
+          error: rej,
+        });
+      });
+    }
+
+    // WWW page path — fetch a fresh CSRF token first, then POST
+    return fetch('/api/method/frappe.auth.get_logged_user', {
+      credentials: 'same-origin'
+    })
+    .then(r => r.headers.get('X-Frappe-CSRF-Token') || window.csrf_token || '')
+    .catch(() => window.csrf_token || '')
+    .then(csrf => {
+      const form = new URLSearchParams();
+      for (const [k, v] of Object.entries(serialised)) {
+        form.set(k, typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''));
+      }
+      return fetch('/api/method/' + fullMethod, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept':        'application/json',
+          'X-Frappe-CSRF-Token': csrf,
+          'X-Requested-With':    'XMLHttpRequest',
+        },
+        body: form.toString(),
+      });
+    })
+    .then(r => {
+      if (!r.ok) return r.json().then(e => {
+        throw new Error(e.exc_type || e._server_messages || `HTTP ${r.status}`);
+      });
       return r.json();
-    }).then(r => {
+    })
+    .then(r => {
       if (r.message !== undefined) return r.message;
       throw new Error(r.exc || 'API error');
     });
