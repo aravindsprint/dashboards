@@ -547,7 +547,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                 sii.uom,
                 SUM(sii.qty)              AS qty,
                 SUM(sii.amount)           AS revenue,
-                MAX(st.sales_person_name) AS sales_person
+                MAX(st.sales_person) AS sales_person
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON si.name = sii.parent
             LEFT JOIN `tabSales Team` st
@@ -571,7 +571,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                 soi.uom,
                 SUM(soi.qty)              AS qty,
                 SUM(soi.amount)           AS order_value,
-                MAX(st.sales_person_name) AS sales_person
+                MAX(st.sales_person) AS sales_person
             FROM `tabSales Order Item` soi
             JOIN `tabSales Order` so ON so.name = soi.parent
             LEFT JOIN `tabSales Team` st
@@ -596,7 +596,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                 si.customer,
                 SUM(sii.qty)              AS qty,
                 SUM(sii.amount)           AS revenue,
-                MAX(st.sales_person_name) AS sales_person
+                MAX(st.sales_person) AS sales_person
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON si.name = sii.parent
             LEFT JOIN `tabSales Team` st
@@ -700,7 +700,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                 ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
             WHERE si.docstatus = 1
               AND si.posting_date BETWEEN %s AND %s
-              AND st.sales_person_name = %s
+              AND st.sales_person = %s
               {cf}
             GROUP BY sii.item_code, si.customer
             ORDER BY revenue DESC
@@ -718,7 +718,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                 si.customer,
                 SUM(si.grand_total)        AS revenue,
                 COUNT(si.name)             AS invoices,
-                MAX(st.sales_person_name)  AS sales_person
+                MAX(st.sales_person)  AS sales_person
             FROM `tabSales Invoice` si
             LEFT JOIN `tabSales Team` st
                 ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
