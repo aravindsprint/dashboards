@@ -682,12 +682,32 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
           });
 
           result.details?.forEach(d => {
-            if (d.status === 'success') log(`  ✓ ${d.phone} — sent`, '');
-            else log(`  ✗ ${d.phone} — ${d.error}`, 'err');
+            if (d.status === 'success') log(`  ✓ ${d.phone} (${d.name}) — sent ✓ ID: ${d.messageId}`, '');
+            else log(`  ✗ ${d.phone} (${d.name}) — FAILED: ${d.error}`, 'err');
           });
 
           sendResult.value = result;
-          log(`\n✅ Done: ${result.success} sent, ${result.failed} failed`, result.failed>0?'warn':'');
+          const doneType = result.failed > 0 ? 'warn' : '';
+          log(`\n${result.failed > 0 ? '⚠️' : '✅'} Done: ${result.success} sent, ${result.failed} failed out of ${result.total}`, doneType);
+          if (result.failed > 0) {
+            log('', '');
+            log('💡 Common reasons for failure:', 'warn');
+            log('  • Template not approved in Meta Business Suite', 'warn');
+            log('  • Phone number format wrong (must be 91XXXXXXXXXX)', 'warn');
+            log('  • Access token expired or invalid', 'warn');
+            log('  • Recipient never messaged your WhatsApp Business number', 'warn');
+            // Also run connection test
+            callApi('test_whatsapp_connection', {}).then(r => {
+              log('', '');
+              log('🔍 Meta API connection test:', 'info');
+              if (r.ok) {
+                log(`  ✓ Token valid — Phone: ${r.response?.display_phone_number || r.phone_id}`, '');
+                log(`  ✓ Account: ${r.response?.verified_name || r.response?.name || 'connected'}`, '');
+              } else {
+                log(`  ✗ Token/Phone issue: ${JSON.stringify(r.response?.error || r)}`, 'err');
+              }
+            }).catch(e => log('  ✗ Connection test failed: ' + e.message, 'err'));
+          }
         } catch(e) {
           log('✗ Error: ' + e.message, 'err');
         } finally {

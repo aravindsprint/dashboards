@@ -336,6 +336,7 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
     total, success, failed = 0, 0, 0
     details = []
 
+    errors = []
     for r in recipients:
         phone = str(r.get("phone", "")).strip()
         if not phone:
@@ -346,6 +347,7 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
             success += 1
         else:
             failed += 1
+            errors.append(f"{phone}: {result.get('error','unknown')}")
         details.append({"phone": phone, "name": r.get("name", ""), **result})
 
     _append_log({
@@ -356,6 +358,7 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
         "success": success,
         "failed":  failed,
         "status":  "completed",
+        "errors":  errors,
     })
 
     return {"total": total, "success": success, "failed": failed, "details": details}
@@ -417,3 +420,32 @@ def run_scheduled_whatsapp():
         )
     except Exception as e:
         frappe.log_error(f"WhatsApp scheduler: send failed — {e}")
+
+
+# ── Debug endpoint — call Meta API and return raw response ───────────────────
+
+@frappe.whitelist()
+def test_whatsapp_connection():
+    """Call Meta Graph API with saved config and return raw response for debugging."""
+    cfg = _get_cache(CACHE_KEY_CONFIG, {})
+    token    = cfg.get("token", "")
+    phone_id = cfg.get("phoneId", "")
+    version  = cfg.get("apiVersion", "v22.0")
+
+    if not token or not phone_id:
+        return {"error": "Missing token or phoneId in saved config"}
+
+    try:
+        # Test: fetch phone number info (doesn't send a message)
+        url = f"https://graph.facebook.com/{version}/{phone_id}"
+        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        data = resp.json()
+        return {
+            "status_code": resp.status_code,
+            "ok": resp.ok,
+            "response": data,
+            "phone_id": phone_id,
+            "token_preview": token[:20] + "…" if token else "MISSING",
+        }
+    except Exception as e:
+        return {"error": str(e)}
