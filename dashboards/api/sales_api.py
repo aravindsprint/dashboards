@@ -514,6 +514,14 @@ def check_app_permission():
 
 
 @frappe.whitelist()
+# ── APPEND THIS ENTIRE BLOCK TO THE END OF sales_api.py ──────────────────────
+
+
+@frappe.whitelist()
+# ── APPEND THIS ENTIRE BLOCK TO THE END OF sales_api.py ──────────────────────
+
+
+@frappe.whitelist()
 def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                    customer=None, state=None, cost_center=None,
                    sales_person=None, commercial_name=None, uom=None,
@@ -724,15 +732,16 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
         si_rows = frappe.db.sql(f"""
             SELECT
                 si.customer,
-                SUM(si.grand_total)       AS revenue,
-                COUNT(si.name)            AS invoices,
+                SUM(sii.amount)           AS revenue,
+                COUNT(DISTINCT si.name)   AS invoices,
                 MAX(st.sales_person)      AS sales_person
-            FROM `tabSales Invoice` si
+            FROM `tabSales Invoice Item` sii
+            JOIN `tabSales Invoice` si ON si.name = sii.parent
             LEFT JOIN `tabSales Team` st
                 ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
             WHERE si.docstatus = 1
               AND si.posting_date BETWEEN %s AND %s
-              AND si.cost_center LIKE %s
+              AND sii.cost_center LIKE %s
               {cf_si}
             GROUP BY si.customer
             ORDER BY revenue DESC
