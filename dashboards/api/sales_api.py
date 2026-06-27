@@ -391,7 +391,7 @@ def get_cost_center_wise(from_date=None, to_date=None, company=None, limit=15):
     from_date, to_date = _date_args(from_date, to_date)
     cf  = _cf(company)
     p   = [from_date, to_date] + ([company] if company else [])
-    cf_so = cf.replace("si.company", "so.company")
+    cf_so = ("AND so.company=%s" if company else "")
 
     # SI — item-level cost_center aggregated to invoice level
     si_rows = frappe.db.sql(
@@ -530,7 +530,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
     """
     from_date, to_date = _date_args(from_date, to_date)
     cf    = _cf(company)
-    cf_so = cf.replace("si.company", "so.company")
+    cf_so = ("AND so.company=%s" if company else "")
     p     = [from_date, to_date] + ([company] if company else [])
 
     # Detect commercial_name column for this installation
