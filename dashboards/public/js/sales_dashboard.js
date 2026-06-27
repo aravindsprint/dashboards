@@ -91,35 +91,72 @@
       const activeTab = ref("overview");
       const txSearch  = ref("");
 
-      /* ── drill-down state ───────────────────────────────────── */
-      const drill = ref({ rowKey: null, tab: null, loading: false, rows: [], type: null });
-      // expandedRows[tabKey] = { rowKey: {rows,loading} } for multi-expand
-      const expandedAll = ref({});  // tabKey → true/false
+      /* ── drill-down state (multi-row) ───────────────────────── */
+      // drillState[tabKey][rowKey] = { loading, rows }
+      const drillState = ref({});
+
+      function isDrillOpen(tab, rowKey) {
+        return !!(drillState.value[tab] && drillState.value[tab][rowKey]);
+      }
+
+      function getDrillRows(tab, rowKey) {
+        return (drillState.value[tab] && drillState.value[tab][rowKey])
+          ? drillState.value[tab][rowKey].rows : [];
+      }
+
+      function isDrillLoading(tab, rowKey) {
+        return !!(drillState.value[tab] && drillState.value[tab][rowKey] &&
+                  drillState.value[tab][rowKey].loading);
+      }
+
+      async function toggleDrill(tab, rowKey, drillType, args) {
+        if (!drillState.value[tab]) drillState.value[tab] = {};
+        // If already open → close it
+        if (drillState.value[tab][rowKey]) {
+          const updated = { ...drillState.value[tab] };
+          delete updated[rowKey];
+          drillState.value = { ...drillState.value, [tab]: updated };
+          return;
+        }
+        // Open and load
+        drillState.value = {
+          ...drillState.value,
+          [tab]: { ...drillState.value[tab], [rowKey]: { loading: true, rows: [] } }
+        };
+        try {
+          const rows = await call("get_drill_down", {
+            drill_type: drillType, ...args,
+            from_date: filters.value.from_date,
+            to_date:   filters.value.to_date,
+            company:   filters.value.company,
+          });
+          drillState.value = {
+            ...drillState.value,
+            [tab]: { ...drillState.value[tab], [rowKey]: { loading: false, rows: rows || [] } }
+          };
+        } catch(e) {
+          drillState.value = {
+            ...drillState.value,
+            [tab]: { ...drillState.value[tab], [rowKey]: { loading: false, rows: [] } }
+          };
+        }
+      }
 
       async function expandAll(tabKey, rows, drillType, keyField, argsBuilder) {
-        expandedAll.value[tabKey] = true;
         for (const row of rows) {
           const key = row[keyField];
-          if (drill.value.tab !== tabKey || drill.value.rowKey !== key) {
-            drill.value = { rowKey: key, tab: tabKey, loading: true, rows: [], type: drillType };
-            try {
-              const res = await call("get_drill_down", {
-                drill_type: drillType, ...argsBuilder(row),
-                from_date: filters.value.from_date,
-                to_date:   filters.value.to_date,
-                company:   filters.value.company,
-              });
-              drill.value.rows = res || [];
-            } catch(e) { drill.value.rows = []; }
-            finally { drill.value.loading = false; }
+          if (!isDrillOpen(tabKey, key)) {
+            await toggleDrill(tabKey, key, drillType, argsBuilder(row));
           }
         }
       }
 
       function collapseAll(tabKey) {
-        expandedAll.value[tabKey] = false;
-        drill.value = { rowKey: null, tab: null, loading: false, rows: [], type: null };
+        drillState.value = { ...drillState.value, [tabKey]: {} };
       }
+
+      // Keep drill ref for backward compat (unused now)
+      const drill = ref({ rowKey: null, tab: null, loading: false, rows: [], type: null });
 
       const tabs = [
         { key: "overview",        icon: "📊", label: "Overview" },
@@ -516,7 +553,7 @@
         summary, trend, topCustomers,
         commercialName, uomData, stateData, spData, ccData, nsData, transactions,
         filteredTransactions,
-        drill, isDrillOpen, toggleDrill, expandAll, collapseAll, expandedAll,
+        drill, drillState, isDrillOpen, getDrillRows, isDrillLoading, toggleDrill, expandAll, collapseAll,
         tableSort, filterText, getSort, toggleSort, sortedRows, sortIcon, sortIconActive,
         fmt, fmtQty, fmtDate, pct, txLink, cleanName,
         applyRange, loadAll,
