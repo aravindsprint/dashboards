@@ -3,11 +3,14 @@
 import frappe
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from frappe.utils import today, add_days, flt
 
 CACHE_KEY_CONFIG = "wa_dashboard_config"
 CACHE_KEY_LOG    = "wa_dashboard_log"
+
+
+# ── Storage (Redis cache) ─────────────────────────────────────────────────────
 
 def _get_cache(key, default=None):
     try:
@@ -19,14 +22,18 @@ def _get_cache(key, default=None):
     return default
 
 def _set_cache(key, value):
-    frappe.cache().set_value(key, json.dumps(value, default=str))
+    try:
+        frappe.cache().set_value(key, json.dumps(value, default=str))
+    except Exception:
+        pass
 
 
-# ── Config ───────────────────────────────────────────────────────────────────
+# ── Config endpoints ──────────────────────────────────────────────────────────
 
 @frappe.whitelist()
 def get_config():
     return _get_cache(CACHE_KEY_CONFIG, {})
+
 
 @frappe.whitelist()
 def save_config(config=None):
@@ -39,12 +46,13 @@ def save_config(config=None):
     return {"success": True}
 
 
-# ── Send log ─────────────────────────────────────────────────────────────────
+# ── Send log ──────────────────────────────────────────────────────────────────
 
 @frappe.whitelist()
 def get_send_log():
     logs = _get_cache(CACHE_KEY_LOG, [])
-    return sorted(logs, key=lambda x: x.get("time",""), reverse=True)[:50]
+    return sorted(logs, key=lambda x: x.get("time", ""), reverse=True)[:50]
+
 
 def _append_log(entry):
     logs = _get_cache(CACHE_KEY_LOG, [])
@@ -52,84 +60,79 @@ def _append_log(entry):
     _set_cache(CACHE_KEY_LOG, logs[-200:])
 
 
-# ── Formatter ────────────────────────────────────────────────────────────────
+# ── Formatter ─────────────────────────────────────────────────────────────────
 
 def _fmt(v):
     v = flt(v)
-    if v >= 1e7:  return f"Rs.{v/1e7:.2f} Cr"
-    if v >= 1e5:  return f"Rs.{v/1e5:.2f} L"
-    if v < 0:     return f"Rs.{v:,.0f}"
+    if v >= 1e7: return f"Rs.{v/1e7:.2f} Cr"
+    if v >= 1e5: return f"Rs.{v/1e5:.2f} L"
+    if v < 0:    return f"Rs.{v:,.0f}"
     return f"Rs.{v:,.0f}"
 
 
-# ── Summary for WhatsApp (mirrors Overview tab) ───────────────────────────────
+# ── Dashboard summary (mirrors Overview tab) ──────────────────────────────────
 
 @frappe.whitelist()
 def get_summary_for_whatsapp(days=30, company=None):
-    days = int(days or 30)
+    days      = int(days or 30)
     to_date   = today()
     from_date = add_days(to_date, -days)
 
-    cf     = "AND si.company=%s"    if company else ""
-    cf_so  = "AND so.company=%s"    if company else ""
-    cf_sii = "AND si.company=%s"    if company else ""
-    p      = [from_date, to_date]   + ([company] if company else [])
+    cf    = "AND si.company=%s" if company else ""
+    cf_so = "AND so.company=%s" if company else ""
+    p     = [from_date, to_date] + ([company] if company else [])
 
-    # ── SI KPIs ──────────────────────────────────────────────────
-    si_row = frappe.db.sql(f"""
+    # Sales Invoice KPIs
+    si = frappe.db.sql(f"""
         SELECT
-            COALESCE(SUM(grand_total), 0)         AS invoiced,
-            COALESCE(SUM(outstanding_amount), 0)  AS outstanding,
-            COUNT(name)                            AS cnt
+            COALESCE(SUM(grand_total), 0)        AS invoiced,
+            COALESCE(SUM(outstanding_amount), 0) AS outstanding,
+            COUNT(name)                           AS cnt
         FROM `tabSales Invoice` si
         WHERE si.docstatus=1
-          AND si.posting_date BETWEEN %s AND %s
-          {cf}
+          AND si.posting_date BETWEEN %s AND %s {cf}
     """, p, as_dict=True)[0]
 
-    total_invoiced    = flt(si_row.invoiced)
-    total_outstanding = flt(si_row.outstanding)
+    total_invoiced    = flt(si.invoiced)
+    total_outstanding = flt(si.outstanding)
     total_collected   = total_invoiced - total_outstanding
-    invoice_count     = int(si_row.cnt or 0)
+    invoice_count     = int(si.cnt or 0)
     collection_rate   = round(total_collected / total_invoiced * 100, 2) if total_invoiced else 0
 
-    # ── SO KPIs ──────────────────────────────────────────────────
-    so_row = frappe.db.sql(f"""
+    # Sales Order KPIs
+    so = frappe.db.sql(f"""
         SELECT
-            COALESCE(SUM(grand_total), 0)                                              AS ordered,
-            COUNT(name)                                                                AS cnt,
+            COALESCE(SUM(grand_total), 0)                                          AS ordered,
+            COUNT(name)                                                            AS cnt,
             SUM(CASE WHEN delivery_status IN ('Not Delivered','Partly Delivered')
-                     THEN 1 ELSE 0 END)                                               AS to_deliver,
-            SUM(CASE WHEN delivery_status='Fully Delivered' THEN 1 ELSE 0 END)        AS full_del,
-            SUM(CASE WHEN status='Completed' THEN 1 ELSE 0 END)                       AS completed
+                     THEN 1 ELSE 0 END)                                           AS to_deliver,
+            SUM(CASE WHEN delivery_status='Fully Delivered' THEN 1 ELSE 0 END)    AS full_del,
+            SUM(CASE WHEN status='Completed' THEN 1 ELSE 0 END)                   AS completed
         FROM `tabSales Order` so
         WHERE so.docstatus=1
-          AND so.transaction_date BETWEEN %s AND %s
-          {cf_so}
+          AND so.transaction_date BETWEEN %s AND %s {cf_so}
     """, p, as_dict=True)[0]
 
-    total_ordered    = flt(so_row.ordered)
-    order_count      = int(so_row.cnt or 0)
-    to_deliver       = int(so_row.to_deliver or 0)
-    fully_delivered  = int(so_row.full_del or 0)
-    completed_orders = int(so_row.completed or 0)
+    total_ordered    = flt(so.ordered)
+    order_count      = int(so.cnt or 0)
+    to_deliver       = int(so.to_deliver or 0)
+    fully_delivered  = int(so.full_del or 0)
+    completed_orders = int(so.completed or 0)
 
-    # ── Cost Centers (item-level, matches dashboard) ──────────────
+    # Cost Centers (item-level)
     cc_rows = frappe.db.sql(f"""
         SELECT
             sii.cost_center,
-            COALESCE(SUM(sii.amount), 0)                                              AS revenue,
+            COALESCE(SUM(sii.amount), 0)                                           AS revenue,
             COALESCE(
                 SUM(si.grand_total - si.outstanding_amount)
-                * SUM(sii.amount) / NULLIF(SUM(si.grand_total), 0), 0)               AS collected,
-            COUNT(DISTINCT si.name)                                                   AS invoices
+                * SUM(sii.amount) / NULLIF(SUM(si.grand_total), 0), 0)            AS collected,
+            COUNT(DISTINCT si.name)                                                AS invoices
         FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         WHERE si.docstatus=1
-          AND si.posting_date BETWEEN %s AND %s
-          {cf_sii}
-          AND sii.cost_center IS NOT NULL
-          AND sii.cost_center != ''
+          AND si.posting_date BETWEEN %s AND %s {cf}
+          AND sii.cost_center IS NOT NULL AND sii.cost_center != ''
         GROUP BY sii.cost_center
         ORDER BY revenue DESC
         LIMIT 10
@@ -163,14 +166,13 @@ def get_summary_for_whatsapp(days=30, company=None):
         "fully_delivered":       fully_delivered,
         "completed_orders":      completed_orders,
         "cost_centers":          cost_centers,
-        # alias kept for template compat
         "total_invoiced":        total_invoiced,
     }
 
 
-# ── Build {{1}}…{{11}} params matching the Meta template exactly ─────────────
+# ── Build {{1}}...{{12}} params for Meta template ─────────────────────────────
 #
-#  Template body in Meta Business Suite:
+#  Meta template body (sales_summary):
 #
 #  📊 *Pranera Sales Report*
 #  _{{1}}_
@@ -188,103 +190,95 @@ def get_summary_for_whatsapp(days=30, company=None):
 #  - To Deliver: *{{10}}*
 #  - Completed: *{{11}}*
 #  _{{12}}_
+#
+#  RULES Meta enforces on parameter text:
+#    - No newlines (\n) or tabs (\t)
+#    - No more than 4 consecutive spaces
+#    - ASCII only (no unicode arrows, bullets, dashes)
 
-def _build_template_params(s, footer="Pranera ERP · Auto Report"):
-    """Return ordered list of values for {{1}}…{{12}} in the Meta template."""
-
-    # {{7}} — cost centers as a plain-text fixed-width table
+def _build_template_params(s, footer="Pranera ERP - Auto Report"):
+    # {{7}} cost centers — pipe-separated single line (no newlines allowed)
     ccs = s.get("cost_centers", [])
     if ccs:
-        def _trunc(name, n=18):
-            return name if len(name) <= n else name[:n - 1] + "\u2026"
-
-        hdr = f"{'#  Name':<20} {'Revenue':>9}  {'Collected':>10}  {'Inv':>4}  {'%':>4}"
-        sep = "\u2500" * 52
-        rows = [hdr, sep]
-
+        parts = []
         for i, cc in enumerate(ccs, 1):
-            name  = _trunc(cc["name"])
-            label = f"{i}. {name}"
-            rev   = cc["revenue"]
-            col   = cc["collected"]
-            inv   = str(cc["invoices"])
-            pct   = f"{cc['pct']}%"
-            rows.append(f"{label:<20} {rev:>9}  {col:>10}  {inv:>4}  {pct:>4}")
-
-        cc_block = "\n".join(rows)
+            name = cc["name"][:15] + "..." if len(cc["name"]) > 15 else cc["name"]
+            parts.append(f"{i}.{name}:{cc['revenue']}({cc['pct']}%)")
+        cc_block = " | ".join(parts)
     else:
         cc_block = "No cost center data"
 
+    # Strip any non-ASCII characters from all values
+    def _safe(v):
+        if not v: return "-"
+        return (str(v)
+            .replace("\u2192", "to")   # →
+            .replace("\u00b7", "-")    # ·
+            .replace("\u2014", "-")    # —
+            .replace("\u2013", "-")    # –
+            .replace("\u2026", "...")) # …
+
     return [
-        f"{s.get('from_date','')} → {s.get('to_date','')}",   # {{1}}  date range
-        s.get("total_invoiced_fmt",    "—"),                    # {{2}}  total invoiced
-        s.get("total_collected_fmt",   "—"),                    # {{3}}  collected
-        s.get("total_outstanding_fmt", "—"),                    # {{4}}  outstanding
-        str(s.get("collection_rate",   0)),                     # {{5}}  collection %
-        str(s.get("invoice_count",     0)),                     # {{6}}  invoice count
-        cc_block,                                               # {{7}}  cost centers
-        s.get("total_ordered_fmt",     "—"),                    # {{8}}  total ordered
-        str(s.get("order_count",       0)),                     # {{9}}  order count
-        str(s.get("to_deliver",        0)),                     # {{10}} to deliver
-        str(s.get("completed_orders",  0)),                     # {{11}} completed
-        footer,                                                 # {{12}} footer
+        f"{s.get('from_date', '')} to {s.get('to_date', '')}",  # {{1}}
+        _safe(s.get("total_invoiced_fmt")),                       # {{2}}
+        _safe(s.get("total_collected_fmt")),                      # {{3}}
+        _safe(s.get("total_outstanding_fmt")),                    # {{4}}
+        str(s.get("collection_rate", 0)),                         # {{5}}
+        str(s.get("invoice_count", 0)),                           # {{6}}
+        cc_block,                                                  # {{7}}
+        _safe(s.get("total_ordered_fmt")),                        # {{8}}
+        str(s.get("order_count", 0)),                             # {{9}}
+        str(s.get("to_deliver", 0)),                              # {{10}}
+        str(s.get("completed_orders", 0)),                        # {{11}}
+        _safe(footer),                                             # {{12}}
     ]
 
 
-def _build_message(s, footer="Pranera ERP · Auto Report"):
-    """Plain-text fallback (used when no template name is set)."""
+def _build_message(s, footer="Pranera ERP - Auto Report"):
+    """Plain-text fallback used when no template name is configured."""
     ccs = s.get("cost_centers", [])
     cc_lines = []
     for i, cc in enumerate(ccs, 1):
-        cc_lines.append(
-            f"  {i}. {cc['name']}: {cc['revenue']} | {cc['pct']}% ({cc['invoices']} inv)"
-        )
-    cc_block = "\n".join(cc_lines) if cc_lines else "  —"
+        cc_lines.append(f"  {i}. {cc['name']}: {cc['revenue']} | {cc['pct']}%")
+    cc_block = "\n".join(cc_lines) if cc_lines else "  -"
 
     return (
-        f"📊 *Pranera Sales Report*\n"
-        f"_{s.get('from_date','')} → {s.get('to_date','')}_\n\n"
-        f"*Invoices*\n"
-        f"- Total Invoiced: *{s.get('total_invoiced_fmt','—')}*\n"
-        f"- Collected: *{s.get('total_collected_fmt','—')}*\n"
-        f"- Outstanding: *{s.get('total_outstanding_fmt','—')}*\n"
-        f"- Collection Rate: *{s.get('collection_rate',0)}%*\n"
+        f"Pranera Sales Report\n"
+        f"{s.get('from_date','')} to {s.get('to_date','')}\n\n"
+        f"Invoices\n"
+        f"- Total Invoiced: {s.get('total_invoiced_fmt','-')}\n"
+        f"- Collected: {s.get('total_collected_fmt','-')}\n"
+        f"- Outstanding: {s.get('total_outstanding_fmt','-')}\n"
+        f"- Collection Rate: {s.get('collection_rate',0)}%\n"
         f"- Count: {s.get('invoice_count',0)} invoices\n\n"
-        f"*Cost Centers*\n{cc_block}\n\n"
-        f"*Orders*\n"
-        f"- Total Ordered: *{s.get('total_ordered_fmt','—')}*\n"
+        f"Cost Centers\n{cc_block}\n\n"
+        f"Orders\n"
+        f"- Total Ordered: {s.get('total_ordered_fmt','-')}\n"
         f"- Count: {s.get('order_count',0)} orders\n"
-        f"- To Deliver: *{s.get('to_deliver',0)}*\n"
-        f"- Completed: *{s.get('completed_orders',0)}*\n\n"
-        f"_{footer}_"
+        f"- To Deliver: {s.get('to_deliver',0)}\n"
+        f"- Completed: {s.get('completed_orders',0)}\n\n"
+        f"{footer}"
     )
 
 
 # ── Send single message via Meta Graph API ────────────────────────────────────
 
 def _send_single(phone, summary, cfg):
-    token    = cfg.get("token", "")
-    phone_id = cfg.get("phoneId", "")
-    version  = cfg.get("apiVersion", "v22.0")
-    template = cfg.get("templateName", "")
-    lang     = cfg.get("languageCode", "en")
-    footer   = cfg.get("messageFooter", "Pranera ERP · Auto Report")
+    token     = cfg.get("token", "")
+    phone_id  = cfg.get("phoneId", "")
+    version   = cfg.get("apiVersion", "v22.0")
+    template  = cfg.get("templateName", "")
+    lang      = cfg.get("languageCode", "en")
+    footer    = cfg.get("messageFooter", "Pranera ERP - Auto Report")
 
     if not token or not phone_id:
         return {"status": "failed", "error": "Missing token or phoneId in config"}
 
     api_url = f"https://graph.facebook.com/{version}/{phone_id}/messages"
     headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
-    s = summary
-
-    # Build cost-center block as a single text param
-    cc_text = ""
-    for i, cc in enumerate(s.get("cost_centers", []), 1):
-        cc_text += f"\n{i}. {cc['name']}: {cc['revenue']} | {cc['pct']}% collected"
 
     if template:
-        # Pass each {{1}}…{{12}} as a separate text parameter
-        params = _build_template_params(s, footer)
+        params = _build_template_params(summary, footer)
         body = {
             "messaging_product": "whatsapp",
             "to": str(phone),
@@ -299,12 +293,12 @@ def _send_single(phone, summary, cfg):
             },
         }
     else:
-        # Freeform text — only works within 24-hr window
+        # Freeform text — only works within 24-hr customer service window
         body = {
             "messaging_product": "whatsapp",
             "to": str(phone),
             "type": "text",
-            "text": {"body": _build_message(s, footer)},
+            "text": {"body": _build_message(summary, footer)},
         }
 
     try:
@@ -313,7 +307,10 @@ def _send_single(phone, summary, cfg):
         if resp.ok and data.get("messages"):
             return {"status": "success", "messageId": data["messages"][0]["id"]}
         err = data.get("error", {})
-        return {"status": "failed", "error": f"{err.get('message', str(data))} (code {err.get('code','')})"}
+        return {
+            "status": "failed",
+            "error": f"{err.get('message', str(data))} (code {err.get('code', '')})",
+        }
     except Exception as e:
         return {"status": "failed", "error": str(e)}
 
@@ -334,9 +331,8 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
     cfg        = config     or {}
 
     total, success, failed = 0, 0, 0
-    details = []
+    details, errors = [], []
 
-    errors = []
     for r in recipients:
         phone = str(r.get("phone", "")).strip()
         if not phone:
@@ -347,7 +343,7 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
             success += 1
         else:
             failed += 1
-            errors.append(f"{phone}: {result.get('error','unknown')}")
+            errors.append(f"{phone}: {result.get('error', 'unknown')}")
         details.append({"phone": phone, "name": r.get("name", ""), **result})
 
     _append_log({
@@ -364,7 +360,7 @@ def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="ma
     return {"total": total, "success": success, "failed": failed, "details": details}
 
 
-# ── Frappe scheduled job ──────────────────────────────────────────────────────
+# ── Frappe scheduled job (called every 5 min via hooks.py) ───────────────────
 
 def run_scheduled_whatsapp():
     cfg = _get_cache(CACHE_KEY_CONFIG, {})
@@ -378,11 +374,13 @@ def run_scheduled_whatsapp():
     except Exception:
         now = datetime.now()
 
-    day_map   = {0:"mon",1:"tue",2:"wed",3:"thu",4:"fri",5:"sat",6:"sun"}
+    # Check day
+    day_map   = {0:"mon", 1:"tue", 2:"wed", 3:"thu", 4:"fri", 5:"sat", 6:"sun"}
     today_key = day_map[now.weekday()]
     if today_key not in (cfg.get("scheduleDays") or []):
         return
 
+    # Check time (within 2-minute window)
     current_hm = now.strftime("%H:%M")
     matched = False
     for t in (cfg.get("scheduleTimes") or []):
@@ -401,10 +399,10 @@ def run_scheduled_whatsapp():
     try:
         summary = get_summary_for_whatsapp(
             days=int(cfg.get("dateRangeDays", 30)),
-            company=cfg.get("company") or None
+            company=cfg.get("company") or None,
         )
     except Exception as e:
-        frappe.log_error(f"WhatsApp scheduler: summary fetch failed — {e}")
+        frappe.log_error(f"WhatsApp scheduler: summary fetch failed - {e}")
         return
 
     active = [r for r in (cfg.get("recipients") or []) if r.get("active")]
@@ -416,18 +414,17 @@ def run_scheduled_whatsapp():
             recipients=active,
             summary=summary,
             config=cfg,
-            trigger="scheduled"
+            trigger="scheduled",
         )
     except Exception as e:
-        frappe.log_error(f"WhatsApp scheduler: send failed — {e}")
+        frappe.log_error(f"WhatsApp scheduler: send failed - {e}")
 
 
-# ── Debug endpoint — call Meta API and return raw response ───────────────────
+# ── Debug: test Meta API connection ──────────────────────────────────────────
 
 @frappe.whitelist()
 def test_whatsapp_connection():
-    """Call Meta Graph API with saved config and return raw response for debugging."""
-    cfg = _get_cache(CACHE_KEY_CONFIG, {})
+    cfg      = _get_cache(CACHE_KEY_CONFIG, {})
     token    = cfg.get("token", "")
     phone_id = cfg.get("phoneId", "")
     version  = cfg.get("apiVersion", "v22.0")
@@ -436,16 +433,49 @@ def test_whatsapp_connection():
         return {"error": "Missing token or phoneId in saved config"}
 
     try:
-        # Test: fetch phone number info (doesn't send a message)
-        url = f"https://graph.facebook.com/{version}/{phone_id}"
-        resp = requests.get(url, headers={"Authorization": f"Bearer {token}"}, timeout=10)
+        resp = requests.get(
+            f"https://graph.facebook.com/{version}/{phone_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
         data = resp.json()
         return {
-            "status_code": resp.status_code,
-            "ok": resp.ok,
-            "response": data,
-            "phone_id": phone_id,
-            "token_preview": token[:20] + "…" if token else "MISSING",
+            "status_code":   resp.status_code,
+            "ok":            resp.ok,
+            "phone_id":      phone_id,
+            "token_preview": token[:20] + "..." if token else "MISSING",
+            "response":      data,
         }
     except Exception as e:
         return {"error": str(e)}
+
+
+# ── Direct send: bypass saved config, pass params explicitly ─────────────────
+
+@frappe.whitelist()
+def direct_send(phone, token, phone_id, template_name, days=30,
+                language_code="en", api_version="v22.0",
+                message_footer="Pranera ERP - Auto Report", company=None):
+    """Send directly without relying on saved config. Useful for testing."""
+    cfg = {
+        "token":         token,
+        "phoneId":       phone_id,
+        "templateName":  template_name,
+        "languageCode":  language_code,
+        "apiVersion":    api_version,
+        "messageFooter": message_footer,
+    }
+    summary = get_summary_for_whatsapp(days=int(days), company=company or None)
+    result  = _send_single(str(phone), summary, cfg)
+
+    _append_log({
+        "id":      str(int(datetime.now().timestamp())),
+        "time":    datetime.now().isoformat(),
+        "trigger": "direct_test",
+        "total":   1,
+        "success": 1 if result["status"] == "success" else 0,
+        "failed":  0 if result["status"] == "success" else 1,
+        "status":  "completed",
+        "errors":  [] if result["status"] == "success" else [f"{phone}: {result.get('error', '')}"],
+    })
+    return result
