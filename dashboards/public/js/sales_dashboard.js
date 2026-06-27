@@ -93,6 +93,33 @@
 
       /* ── drill-down state ───────────────────────────────────── */
       const drill = ref({ rowKey: null, tab: null, loading: false, rows: [], type: null });
+      // expandedRows[tabKey] = { rowKey: {rows,loading} } for multi-expand
+      const expandedAll = ref({});  // tabKey → true/false
+
+      async function expandAll(tabKey, rows, drillType, keyField, argsBuilder) {
+        expandedAll.value[tabKey] = true;
+        for (const row of rows) {
+          const key = row[keyField];
+          if (drill.value.tab !== tabKey || drill.value.rowKey !== key) {
+            drill.value = { rowKey: key, tab: tabKey, loading: true, rows: [], type: drillType };
+            try {
+              const res = await call("get_drill_down", {
+                drill_type: drillType, ...argsBuilder(row),
+                from_date: filters.value.from_date,
+                to_date:   filters.value.to_date,
+                company:   filters.value.company,
+              });
+              drill.value.rows = res || [];
+            } catch(e) { drill.value.rows = []; }
+            finally { drill.value.loading = false; }
+          }
+        }
+      }
+
+      function collapseAll(tabKey) {
+        expandedAll.value[tabKey] = false;
+        drill.value = { rowKey: null, tab: null, loading: false, rows: [], type: null };
+      }
 
       const tabs = [
         { key: "overview",        icon: "📊", label: "Overview" },
@@ -489,7 +516,7 @@
         summary, trend, topCustomers,
         commercialName, uomData, stateData, spData, ccData, nsData, transactions,
         filteredTransactions,
-        drill, isDrillOpen, toggleDrill,
+        drill, isDrillOpen, toggleDrill, expandAll, collapseAll, expandedAll,
         tableSort, filterText, getSort, toggleSort, sortedRows, sortIcon, sortIconActive,
         fmt, fmtQty, fmtDate, pct, txLink, cleanName,
         applyRange, loadAll,

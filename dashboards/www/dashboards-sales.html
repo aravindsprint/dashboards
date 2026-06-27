@@ -126,6 +126,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-tbadge.ord{background:#E0F7FA;color:#0097A7}
 .sd-pill{display:inline-block;font-size:11px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
 .sd-empty{text-align:center;color:var(--m);padding:28px;font-style:italic}
+.sd-xbtn{padding:3px 10px;font-size:11px;font-weight:600;border:1px solid var(--br);border-radius:5px;background:#fff;cursor:pointer;color:var(--m);transition:.15s}
+.sd-xbtn:hover{border-color:var(--b2);color:var(--b2)}
+.sd-expand-btn{padding:4px 12px;font-size:11px;font-weight:600;border:1px solid var(--br);border-radius:6px;background:#fff;cursor:pointer;color:var(--m);transition:.15s;display:inline-flex;align-items:center;gap:4px}
+.sd-expand-btn:hover{border-color:var(--b2);color:var(--b2)}
 
 /* drill-down panel */
 .sd-drill{background:#F0F7FF;border-top:2px solid #1565C020;padding:0}
@@ -362,7 +366,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
       <!-- Top customers table with drill → item lines -->
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge inv">Invoices</span></div>
+        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge inv">Invoices</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('si_cust', topCustomers.by_invoice, 'customer_items', 'customer', r=>({customer:r.customer}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('si_cust')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['si_cust']" class="sd-search" placeholder="Filter customers…"/>
         </div>
@@ -440,7 +444,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
       <!-- Customer table with drill → item lines -->
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge ord">Orders</span></div>
+        <div class="sd-ch"><span class="sd-ct">Customer Details</span><span class="sd-badge ord">Orders</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('so_cust', topCustomers.by_order, 'customer_order_items', 'customer', r=>({customer:r.customer}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('so_cust')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['so_cust']" class="sd-search" placeholder="Filter customers…"/>
         </div>
@@ -512,7 +516,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       </div>
       <!-- Commercial name table → drill to item codes + customers -->
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Commercial Name Details</span></div>
+        <div class="sd-ch"><span class="sd-ct">Commercial Name Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('cn', commercialName.by_invoice, 'commercial_name_detail', 'commercial_name', r=>({commercial_name:r.commercial_name}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('cn')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['cn']" class="sd-search" placeholder="Filter commercial names…"/>
         </div>
@@ -591,7 +595,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">UOM Details</span></div>
+        <div class="sd-ch"><span class="sd-ct">UOM Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('uom', uomData.by_invoice, 'uom_items', 'uom', r=>({uom:r.uom}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('uom')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['uom']" class="sd-search" placeholder="Filter UOM…"/>
         </div>
@@ -666,7 +670,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">State Details</span></div>
+        <div class="sd-ch"><span class="sd-ct">State Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('state', stateData.by_invoice, 'state_customers', 'state', r=>({state:r.state}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('state')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['state']" class="sd-search" placeholder="Filter states…"/>
         </div>
@@ -741,7 +745,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Sales Person Performance</span></div>
+        <div class="sd-ch"><span class="sd-ct">Sales Person Performance</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('sp', spData.by_invoice, 'salesperson_items', 'sales_person', r=>({sales_person:r.sales_person}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('sp')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['sp']" class="sd-search" placeholder="Filter sales persons…"/>
         </div>
@@ -820,7 +824,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Cost Center Details</span></div>
+        <div class="sd-ch"><span class="sd-ct">Cost Center Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('cc', ccData.by_invoice, 'cost_center_customers', 'cost_center', r=>({cost_center:r.cost_center}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('cc')">⊟ Collapse All</button></div><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('ov_cc', ccData.by_invoice, 'cost_center_customers', 'cost_center', r=>({cost_center:r.cost_center}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('ov_cc')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['cc']" class="sd-search" placeholder="Filter cost centers…"/>
         </div>
@@ -910,7 +914,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Naming Series Details</span></div>
+        <div class="sd-ch"><span class="sd-ct">Naming Series Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('ns', nsData.by_invoice, 'naming_series_docs', 'naming_series', r=>({naming_series:r.naming_series}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('ns')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['ns']" class="sd-search" placeholder="Filter series…"/>
         </div>
@@ -981,6 +985,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
       <div class="sd-card">
         <div class="sd-ch">
           <span class="sd-ct">Recent Transactions</span>
+          <div style="display:flex;gap:6px;align-items:center"><button class="sd-xbtn" @click="expandAll('txn', filteredTransactions, 'transaction_items', 'name', r=>({doc_name:r.name, doc_type:r.type}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('txn')">⊟ Collapse All</button></div>
           <input v-model="txSearch" class="sd-input" placeholder="Search customer or ID…" style="width:220px"/>
         </div>
         <div class="sd-twrap">
