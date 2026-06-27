@@ -76,7 +76,7 @@ def _fmt(v):
 def get_summary_for_whatsapp(days=30, company=None):
     days      = int(days or 30)
     to_date   = today()
-    from_date = add_days(to_date, -days)
+    from_date = to_date if days == 1 else add_days(to_date, -days)
 
     cf    = "AND si.company=%s" if company else ""
     cf_so = "AND so.company=%s" if company else ""
@@ -200,11 +200,18 @@ def _build_template_params(s, footer="Pranera ERP - Auto Report"):
     # {{7}} cost centers — pipe-separated single line (no newlines allowed)
     ccs = s.get("cost_centers", [])
     if ccs:
-        parts = []
+        lines = []
         for i, cc in enumerate(ccs, 1):
-            name = cc["name"][:15] + "..." if len(cc["name"]) > 15 else cc["name"]
-            parts.append(f"{i}.{name}:{cc['revenue']}({cc['pct']}%)")
-        cc_block = " | ".join(parts)
+            name = cc["name"][:20] + "..." if len(cc["name"]) > 20 else cc["name"]
+            bar_on  = round(cc["pct"] / 10)
+            bar_off = 10 - bar_on
+            bar = "█" * bar_on + "░" * bar_off
+            lines.append(
+                f"{i}. {name}\n"
+                f"   Rev: {cc['revenue']} | Col: {cc['collected']}\n"
+                f"   [{bar}] {cc['pct']}% ({cc['invoices']} inv)"
+            )
+        cc_block = "\n\n".join(lines)
     else:
         cc_block = "No cost center data"
 
