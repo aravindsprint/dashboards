@@ -656,7 +656,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY si.customer
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [state], as_dict=True)
+        """, p_base + [state] + p_co, as_dict=True)
 
         so_rows = frappe.db.sql(f"""
             SELECT
@@ -677,7 +677,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY so.customer
             ORDER BY order_value DESC
             LIMIT 20
-        """, p + [state], as_dict=True)
+        """, p_base + [state] + p_co, as_dict=True)
 
         so_map = {r.customer: r for r in so_rows}
         for r in si_rows:
@@ -732,7 +732,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY si.customer
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [cc_like], as_dict=True)
+        """, p_base + [cc_like] + p_co, as_dict=True)
 
         so_rows = frappe.db.sql(f"""
             SELECT
@@ -747,7 +747,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY so.customer
             ORDER BY order_value DESC
             LIMIT 20
-        """, p + [cc_like], as_dict=True)
+        """, p_base + [cc_like] + p_co, as_dict=True)
 
         so_map = {r.customer: r for r in so_rows}
         for r in si_rows:
