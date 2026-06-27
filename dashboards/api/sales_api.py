@@ -532,6 +532,9 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
     cf    = _cf(company)
     cf_so = cf.replace("si.company", "so.company")
     p     = [from_date, to_date] + ([company] if company else [])
+    # p_base excludes company so we can place customer before company in params
+    p_base = [from_date, to_date]
+    p_co   = ([company] if company else [])
 
     # Detect commercial_name column for this installation
     si_cn = _commercial_name_col("tabSales Invoice Item") or "item_name"
@@ -559,7 +562,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY sii.item_code, sii.uom
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [customer], as_dict=True)
+        """, p_base + [customer] + p_co, as_dict=True)
 
     # ── 2. Customer → SO line items ────────────────────────────────────────────
     if drill_type == "customer_order_items":
@@ -583,7 +586,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY soi.item_code, soi.uom
             ORDER BY order_value DESC
             LIMIT 20
-        """, p + [customer], as_dict=True)
+        """, p_base + [customer] + p_co, as_dict=True)
 
     # ── 3. Commercial name → item codes + customers ────────────────────────────
     if drill_type == "commercial_name_detail":
@@ -608,7 +611,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY sii.item_code, si.customer
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [commercial_name], as_dict=True)
+        """, p_base + [commercial_name] + p_co, as_dict=True)
 
     # ── 4. UOM → item codes ────────────────────────────────────────────────────
     if drill_type == "uom_items":
@@ -628,7 +631,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY sii.item_code
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [uom], as_dict=True)
+        """, p_base + [uom] + p_co, as_dict=True)
 
     # ── 5. State → customers ───────────────────────────────────────────────────
     if drill_type == "state_customers":
@@ -705,7 +708,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             GROUP BY sii.item_code, si.customer
             ORDER BY revenue DESC
             LIMIT 20
-        """, p + [sales_person], as_dict=True)
+        """, p_base + [sales_person] + p_co, as_dict=True)
 
     # ── 7. Cost center → customers + sales persons ─────────────────────────────
     if drill_type == "cost_center_customers":
@@ -769,7 +772,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
               {cf}
             ORDER BY posting_date DESC
             LIMIT 20
-        """, p + [naming_series], as_dict=True)
+        """, p_base + [naming_series] + p_co, as_dict=True)
 
     # ── 9. Transaction → line items (SI or SO) ─────────────────────────────────
     if drill_type == "transaction_items":
