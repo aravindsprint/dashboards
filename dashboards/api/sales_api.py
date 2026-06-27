@@ -522,6 +522,10 @@ def check_app_permission():
 
 
 @frappe.whitelist()
+# ── APPEND THIS ENTIRE BLOCK TO THE END OF sales_api.py ──────────────────────
+
+
+@frappe.whitelist()
 def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                    customer=None, state=None, cost_center=None,
                    sales_person=None, commercial_name=None, uom=None,
@@ -602,27 +606,37 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
 
     # ── 3. Commercial name → item codes + customers ────────────────────────────
     if drill_type == "commercial_name_detail":
+        # Try to get color from item master
+        try:
+            has_color = frappe.db.sql(
+                "SELECT 1 FROM information_schema.COLUMNS "
+                "WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='tabItem' AND COLUMN_NAME='color' LIMIT 1"
+            )
+            color_col = "i.color" if has_color else "sii.item_name"
+        except Exception:
+            color_col = "sii.item_name"
+
         return frappe.db.sql(f"""
             SELECT
-                sii.item_code,
-                sii.item_name,
+                {color_col}               AS color,
                 sii.{si_cn}               AS commercial_name,
                 sii.uom,
                 si.customer,
                 SUM(sii.qty)              AS qty,
                 SUM(sii.amount)           AS revenue,
-                MAX(st.sales_person) AS sales_person
+                MAX(st.sales_person)      AS sales_person
             FROM `tabSales Invoice Item` sii
             JOIN `tabSales Invoice` si ON si.name = sii.parent
+            LEFT JOIN `tabItem` i ON i.name = sii.item_code
             LEFT JOIN `tabSales Team` st
                 ON st.parent = si.name AND st.parenttype = 'Sales Invoice'
             WHERE si.docstatus = 1
               AND si.posting_date BETWEEN %s AND %s
               AND sii.{si_cn} = %s
-              {'AND si.company=%s' if company else ''}
-            GROUP BY sii.item_code, si.customer
+              {{'AND si.company=%s' if company else ''}}
+            GROUP BY {color_col}, sii.uom
             ORDER BY revenue DESC
-            LIMIT 20
+            LIMIT 30
         """, p_base + [commercial_name] + p_co, as_dict=True)
 
     # ── 4. UOM → item codes ────────────────────────────────────────────────────
@@ -645,15 +659,14 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             LIMIT 20
         """, p_base + [uom] + p_co, as_dict=True)
 
-    # ── 5. State → customers ───────────────────────────────────────────────────
+    # ── 5. State → cities ───────────────────────────────────────────────────────
     if drill_type == "state_customers":
-        # Try customer-level state field first, fall back to address
         si_rows = frappe.db.sql(f"""
             SELECT
-                si.customer,
-                SUM(si.grand_total)        AS revenue,
-                COUNT(si.name)             AS invoices,
-                SUM(si.outstanding_amount) AS outstanding
+                COALESCE(addr.city, 'Unknown') AS city,
+                SUM(si.grand_total)             AS revenue,
+                COUNT(si.name)                  AS invoices,
+                SUM(si.outstanding_amount)      AS outstanding
             FROM `tabSales Invoice` si
             JOIN `tabCustomer` c ON c.name = si.customer
             LEFT JOIN `tabDynamic Link` dl
@@ -665,16 +678,16 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
               AND si.posting_date BETWEEN %s AND %s
               AND COALESCE(addr.state, '') = %s
               {cf}
-            GROUP BY si.customer
+            GROUP BY addr.city
             ORDER BY revenue DESC
             LIMIT 20
         """, p_base + [state] + p_co, as_dict=True)
 
         so_rows = frappe.db.sql(f"""
             SELECT
-                so.customer,
-                SUM(so.grand_total) AS order_value,
-                COUNT(so.name)      AS orders
+                COALESCE(addr.city, 'Unknown') AS city,
+                SUM(so.grand_total)             AS order_value,
+                COUNT(so.name)                  AS orders
             FROM `tabSales Order` so
             JOIN `tabCustomer` c ON c.name = so.customer
             LEFT JOIN `tabDynamic Link` dl
@@ -686,14 +699,14 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
               AND so.transaction_date BETWEEN %s AND %s
               AND COALESCE(addr.state, '') = %s
               {cf_so}
-            GROUP BY so.customer
+            GROUP BY addr.city
             ORDER BY order_value DESC
             LIMIT 20
         """, p_base + [state] + p_co, as_dict=True)
 
-        so_map = {r.customer: r for r in so_rows}
+        so_map = {r.city: r for r in so_rows}
         for r in si_rows:
-            so = so_map.get(r.customer, {})
+            so = so_map.get(r.city, {})
             r["order_value"] = so.get("order_value", 0)
             r["orders"]      = so.get("orders", 0)
         return si_rows
@@ -729,6 +742,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
         cf_si   = ("AND si.company=%s" if company else "")
         cf_so2  = ("AND so.company=%s" if company else "")
 
+        # Cost center is stored at item level (tabSales Invoice Item), not header
         si_rows = frappe.db.sql(f"""
             SELECT
                 si.customer,
@@ -751,12 +765,13 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
         so_rows = frappe.db.sql(f"""
             SELECT
                 so.customer,
-                SUM(so.grand_total) AS order_value,
-                COUNT(so.name)      AS orders
-            FROM `tabSales Order` so
+                SUM(soi.amount) AS order_value,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Order Item` soi
+            JOIN `tabSales Order` so ON so.name = soi.parent
             WHERE so.docstatus = 1
               AND so.transaction_date BETWEEN %s AND %s
-              AND so.cost_center LIKE %s
+              AND soi.cost_center LIKE %s
               {cf_so2}
             GROUP BY so.customer
             ORDER BY order_value DESC

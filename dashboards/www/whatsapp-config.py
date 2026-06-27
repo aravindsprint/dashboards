@@ -1,10 +1,14 @@
-# apps/dashboards/dashboards/www/whatsapp-config.py
-no_cache = 1
+# dashboards/www/whatsapp-config.py
+
+import frappe
 
 def get_context(context):
-    import frappe
+    # Restrict access to System Manager role only
     if frappe.session.user == "Guest":
-        frappe.local.flags.redirect_location = "/login?redirect-to=/whatsapp-config"
-        raise frappe.Redirect
-    context.csrf_token = frappe.sessions.get_csrf_token()
+        frappe.throw("Please login to access this page.", frappe.PermissionError)
+    
+    if "System Manager" not in frappe.get_roles(frappe.session.user):
+        frappe.throw("You do not have permission to access this page. System Manager role required.", frappe.PermissionError)
+    
     context.no_cache = 1
+    return context

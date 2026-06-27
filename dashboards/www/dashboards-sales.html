@@ -552,20 +552,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
                       <template v-else-if="getDrillRows('cn', row.commercial_name).length">
                         <table>
                           <thead><tr>
-                            <th>Item Code</th>
-                            <th>Item Name</th>
+                            <th>Color</th>
                             <th>UOM</th>
-                            <th>Customer</th>
                             <th class="sd-th-r">Qty</th>
                             <th class="sd-th-r">Revenue</th>
                             <th>Sales Person</th>
                           </tr></thead>
                           <tbody>
                             <tr v-for="d in getDrillRows('cn', row.commercial_name)" :key="d.item_code+d.customer">
-                              <td><span class="sd-mono">{{ d.item_code }}</span></td>
-                              <td>{{ d.item_name }}</td>
+                              <td>{{ d.color || d.item_name || '—' }}</td>
                               <td>{{ d.uom }}</td>
-                              <td>{{ d.customer }}</td>
                               <td class="sd-amt">{{ fmtQty(d.qty) }}</td>
                               <td class="sd-amt">{{ fmt(d.revenue) }}</td>
                               <td>{{ d.sales_person || '—' }}</td>
@@ -706,15 +702,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
                       <template v-else-if="getDrillRows('state', row.state).length">
                         <table>
                           <thead><tr>
-                            <th>Customer</th>
+                            <th>City</th>
                             <th class="sd-th-r">Revenue</th>
                             <th class="sd-th-r">Invoices</th>
                             <th class="sd-th-r">Order Value</th>
                             <th class="sd-th-r">Orders</th>
                           </tr></thead>
                           <tbody>
-                            <tr v-for="d in getDrillRows('state', row.state)" :key="d.customer">
-                              <td>{{ d.customer }}</td>
+                            <tr v-for="d in getDrillRows('state', row.state)" :key="d.city || d.customer">
+                              <td>{{ d.city || d.customer || '—' }}</td>
                               <td class="sd-amt">{{ fmt(d.revenue) }}</td>
                               <td class="sd-amt">{{ d.invoices }}</td>
                               <td class="sd-amt">{{ fmt(d.order_value) }}</td>
