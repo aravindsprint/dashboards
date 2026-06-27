@@ -824,7 +824,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
         </div>
       </div>
       <div class="sd-card" style="margin-top:16px">
-        <div class="sd-ch"><span class="sd-ct">Cost Center Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('cc', ccData.by_invoice, 'cost_center_customers', 'cost_center', r=>({cost_center:r.cost_center}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('cc')">⊟ Collapse All</button></div><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('ov_cc', ccData.by_invoice, 'cost_center_customers', 'cost_center', r=>({cost_center:r.cost_center}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('ov_cc')">⊟ Collapse All</button></div></div>
+        <div class="sd-ch"><span class="sd-ct">Cost Center Details</span><div style="display:flex;gap:6px"><button class="sd-xbtn" @click="expandAll('cc', ccData.by_invoice, 'cost_center_customers', 'cost_center', r=>({cost_center:r.cost_center}))">⊞ Expand All</button><button class="sd-xbtn" @click="collapseAll('cc')">⊟ Collapse All</button></div></div>
         <div class="sd-toolbar">
           <input v-model="filterText['cc']" class="sd-search" placeholder="Filter cost centers…"/>
         </div>
