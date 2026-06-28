@@ -526,6 +526,10 @@ def check_app_permission():
 
 
 @frappe.whitelist()
+# ── APPEND THIS ENTIRE BLOCK TO THE END OF sales_api.py ──────────────────────
+
+
+@frappe.whitelist()
 def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                    customer=None, state=None, cost_center=None,
                    sales_person=None, commercial_name=None, uom=None,
