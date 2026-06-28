@@ -620,12 +620,12 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
         except Exception:
             color_col = "sii.item_name"
 
+        cf_cn = "AND si.company=%s" if company else ""
         return frappe.db.sql(f"""
             SELECT
                 {color_col}               AS color,
                 sii.{si_cn}               AS commercial_name,
                 sii.uom,
-                si.customer,
                 SUM(sii.qty)              AS qty,
                 SUM(sii.amount)           AS revenue,
                 MAX(st.sales_person)      AS sales_person
@@ -637,7 +637,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
             WHERE si.docstatus = 1
               AND si.posting_date BETWEEN %s AND %s
               AND sii.{si_cn} = %s
-              {{'AND si.company=%s' if company else ''}}
+              {cf_cn}
             GROUP BY {color_col}, sii.uom
             ORDER BY revenue DESC
             LIMIT 30
