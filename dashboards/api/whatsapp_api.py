@@ -197,28 +197,44 @@ def get_summary_for_whatsapp(days=30, company=None):
 #    - ASCII only (no unicode arrows, bullets, dashes)
 
 def _build_template_params(s, footer="Pranera ERP - Auto Report"):
-    # {{7}} cost centers — pipe-separated single line (no newlines allowed)
+    """
+    Build parameters for sales_summary_v2 template (17 variables):
+      {{1}}  date range
+      {{2}}  total invoiced
+      {{3}}  collected
+      {{4}}  outstanding
+      {{5}}  collection rate
+      {{6}}  invoice count
+      {{7}}–{{12}}  cost centers (one per line, up to 6)
+      {{13}} total ordered
+      {{14}} order count
+      {{15}} to deliver
+      {{16}} completed orders
+      {{17}} footer
+    """
     ccs = s.get("cost_centers", [])
-    if ccs:
-        parts = []
-        for i, cc in enumerate(ccs, 1):
-            name = cc["name"][:18] + "..." if len(cc["name"]) > 18 else cc["name"]
-            parts.append(
-                f"{i}. {name}: {cc['revenue']} | Collected: {cc['collected']} | {cc['pct']}% ({cc['invoices']} inv)"
-            )
-        cc_block = " | ".join(parts)
-    else:
-        cc_block = "No cost center data"
+
+    # Build up to 6 cost center lines — each as its own parameter
+    def _cc_line(cc, i):
+        name = cc["name"][:20] + ".." if len(cc["name"]) > 20 else cc["name"]
+        return f"{i}. {name}: {cc['revenue']} | {cc['pct']}% ({cc['invoices']} inv)"
+
+    cc_params = []
+    for i in range(6):
+        if i < len(ccs):
+            cc_params.append(_cc_line(ccs[i], i + 1))
+        else:
+            cc_params.append("-")  # empty slot
 
     # Strip any non-ASCII characters from all values
     def _safe(v):
         if not v: return "-"
         return (str(v)
-            .replace("\u2192", "to")   # →
-            .replace("\u00b7", "-")    # ·
-            .replace("\u2014", "-")    # —
-            .replace("\u2013", "-")    # –
-            .replace("\u2026", "...")) # …
+            .replace("→", "to")   # →
+            .replace("·", "-")    # ·
+            .replace("—", "-")    # —
+            .replace("–", "-")    # –
+            .replace("…", "...")) # …
 
     return [
         f"{s.get('from_date', '')} to {s.get('to_date', '')}",  # {{1}}
@@ -227,12 +243,17 @@ def _build_template_params(s, footer="Pranera ERP - Auto Report"):
         _safe(s.get("total_outstanding_fmt")),                    # {{4}}
         str(s.get("collection_rate", 0)),                         # {{5}}
         str(s.get("invoice_count", 0)),                           # {{6}}
-        cc_block,                                                  # {{7}}
-        _safe(s.get("total_ordered_fmt")),                        # {{8}}
-        str(s.get("order_count", 0)),                             # {{9}}
-        str(s.get("to_deliver", 0)),                              # {{10}}
-        str(s.get("completed_orders", 0)),                        # {{11}}
-        _safe(footer),                                             # {{12}}
+        cc_params[0],                                             # {{7}}  CC 1
+        cc_params[1],                                             # {{8}}  CC 2
+        cc_params[2],                                             # {{9}}  CC 3
+        cc_params[3],                                             # {{10}} CC 4
+        cc_params[4],                                             # {{11}} CC 5
+        cc_params[5],                                             # {{12}} CC 6
+        _safe(s.get("total_ordered_fmt")),                        # {{13}}
+        str(s.get("order_count", 0)),                             # {{14}}
+        str(s.get("to_deliver", 0)),                              # {{15}}
+        str(s.get("completed_orders", 0)),                        # {{16}}
+        _safe(footer),                                             # {{17}}
     ]
 
 
