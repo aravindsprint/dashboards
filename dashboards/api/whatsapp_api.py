@@ -12,7 +12,23 @@ CACHE_KEY_LOG    = "wa_dashboard_log"
 
 # ── Storage (Redis cache) ─────────────────────────────────────────────────────
 
+def _config_path():
+    import os
+    return os.path.join(frappe.get_site_path(), "wa_config.json")
+
 def _get_cache(key, default=None):
+    # Primary: persistent JSON file (survives bench restart & deploys)
+    try:
+        import os
+        path = _config_path()
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                data = json.load(f)
+            if key in data:
+                return data[key]
+    except Exception:
+        pass
+    # Fallback: Redis
     try:
         val = frappe.cache().get_value(key)
         if val:
@@ -22,6 +38,20 @@ def _get_cache(key, default=None):
     return default
 
 def _set_cache(key, value):
+    # Primary: write to persistent JSON file
+    try:
+        import os
+        path = _config_path()
+        data = {}
+        if os.path.exists(path):
+            with open(path, "r") as f:
+                data = json.load(f)
+        data[key] = value
+        with open(path, "w") as f:
+            json.dump(data, f, default=str, indent=2)
+    except Exception as e:
+        frappe.log_error(f"wa_config write: {e}")
+    # Also update Redis for fast access
     try:
         frappe.cache().set_value(key, json.dumps(value, default=str))
     except Exception:
