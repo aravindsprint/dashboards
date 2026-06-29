@@ -104,6 +104,9 @@ def _fmt(v):
 
 @frappe.whitelist()
 def get_summary_for_whatsapp(days=30, company=None):
+    # Default to primary company if not specified
+    if not company:
+        company = frappe.defaults.get_global_default("company") or None
     days = int(days or 30)
     # Use IST timezone for today to match dashboard
     try:
@@ -120,7 +123,7 @@ def get_summary_for_whatsapp(days=30, company=None):
     cf_so = "AND so.company=%s" if company else ""
     p     = [from_date, to_date] + ([company] if company else [])
 
-    # Sales Invoice KPIs
+    # Sales Invoice KPIs — same as dashboard (docstatus=1 only)
     si = frappe.db.sql(f"""
         SELECT
             COALESCE(SUM(grand_total), 0)        AS invoiced,
