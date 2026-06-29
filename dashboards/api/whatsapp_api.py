@@ -74,9 +74,17 @@ def _fmt(v):
 
 @frappe.whitelist()
 def get_summary_for_whatsapp(days=30, company=None):
-    days      = int(days or 30)
-    to_date   = today()
-    from_date = to_date if days == 1 else add_days(to_date, -days)
+    days = int(days or 30)
+    # Use IST timezone for today to match dashboard
+    try:
+        import pytz
+        from datetime import datetime as dt
+        ist = pytz.timezone("Asia/Kolkata")
+        to_date   = dt.now(ist).strftime("%Y-%m-%d")
+        from_date = to_date if days == 1 else add_days(to_date, -days)
+    except Exception:
+        to_date   = today()
+        from_date = to_date if days == 1 else add_days(to_date, -days)
 
     cf    = "AND si.company=%s" if company else ""
     cf_so = "AND so.company=%s" if company else ""
