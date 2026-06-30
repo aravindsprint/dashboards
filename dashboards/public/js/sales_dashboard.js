@@ -59,6 +59,43 @@
     return d.toISOString().split("T")[0];
   }
 
+  function startOfWeek(dateStr) {
+    const d = new Date(dateStr);
+    const day = d.getDay(); // 0=Sun, 1=Mon
+    d.setDate(d.getDate() - (day === 0 ? 6 : day - 1)); // Monday
+    return d.toISOString().split("T")[0];
+  }
+
+  function startOfMonth(dateStr) {
+    const d = new Date(dateStr);
+    d.setDate(1);
+    return d.toISOString().split("T")[0];
+  }
+
+  function startOfQuarter(dateStr) {
+    const d = new Date(dateStr);
+    const q = Math.floor(d.getMonth() / 3);
+    d.setMonth(q * 3);
+    d.setDate(1);
+    return d.toISOString().split("T")[0];
+  }
+
+  function startOfYear(dateStr) {
+    const d = new Date(dateStr);
+    d.setMonth(0);
+    d.setDate(1);
+    return d.toISOString().split("T")[0];
+  }
+
+  function startOfFiscalYear(dateStr) {
+    // India fiscal year: April 1 – March 31
+    const d = new Date(dateStr);
+    const month = d.getMonth(); // 0-indexed
+    // If Jan–Mar, fiscal year started previous year April 1
+    const fyYear = month < 3 ? d.getFullYear() - 1 : d.getFullYear();
+    return `${fyYear}-04-01`;
+  }
+
   /* ── chart registry ─────────────────────────────────────────── */
   const CH = {};
   const kill = (id) => { if (CH[id]) { CH[id].destroy(); delete CH[id]; } };
@@ -88,11 +125,22 @@
     setup() {
       const today = todayStr();
       const DEFAULT_COMPANY = "Pranera Services and Solutions Pvt. Ltd.,";
-      const filters = ref({ from_date: subMonths(today, 1), to_date: today, company: "" });
-      const activeRange = ref("1M");
+      // Default: Today
+      const filters = ref({ from_date: today, to_date: today, company: "" });
+      const activeRange = ref("Today");
       const quickRanges = [
-        { label: "1W", days: 7 }, { label: "1M", months: 1 },
-        { label: "3M", months: 3 }, { label: "6M", months: 6 }, { label: "1Y", months: 12 },
+        { label: "Today",     fn: (t) => ({ from: t,                  to: t                  }) },
+        { label: "Yesterday", fn: (t) => ({ from: subDays(t, 1),     to: subDays(t, 1)      }) },
+        { label: "1W",        fn: (t) => ({ from: subDays(t, 7),     to: t                  }) },
+        { label: "This Week", fn: (t) => ({ from: startOfWeek(t),    to: t                  }) },
+        { label: "1M",        fn: (t) => ({ from: subMonths(t, 1),   to: t                  }) },
+        { label: "This Month",fn: (t) => ({ from: startOfMonth(t),   to: t                  }) },
+        { label: "3M",        fn: (t) => ({ from: subMonths(t, 3),   to: t                  }) },
+        { label: "This Qtr",  fn: (t) => ({ from: startOfQuarter(t), to: t                  }) },
+        { label: "6M",        fn: (t) => ({ from: subMonths(t, 6),   to: t                  }) },
+        { label: "1Y",        fn: (t) => ({ from: subMonths(t, 12),  to: t                  }) },
+        { label: "This Year", fn: (t) => ({ from: startOfYear(t),    to: t                  }) },
+        { label: "Fiscal Yr",  fn: (t) => ({ from: startOfFiscalYear(t), to: t              }) },
       ];
 
       const loading   = ref(true);
@@ -168,8 +216,9 @@
       function applyRange(r) {
         activeRange.value = r.label;
         const t = todayStr();
-        filters.value.from_date = r.days ? subDays(t, r.days) : subMonths(t, r.months);
-        filters.value.to_date = t;
+        const range = r.fn ? r.fn(t) : { from: subDays(t, r.days || 30), to: t };
+        filters.value.from_date = range.from;
+        filters.value.to_date   = range.to;
         loadAll();
       }
 
