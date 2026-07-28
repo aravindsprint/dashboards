@@ -1,0 +1,21 @@
+<script>window.csrf_token="{{ csrf_token }}";</script>
+{%- raw -%}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Dashboards — Pranera ERP</title>
+  <meta name="theme-color" content="#1565C0"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-title" content="Dashboards"/>
+  <link rel="icon" type="image/svg+xml" href="/assets/dashboards/images/favicon.svg"/>
+  <link rel="stylesheet" href="/assets/dashboards/dashboard_app/index.css"/>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/assets/dashboards/dashboard_app/index.js"></script>
+</body>
+</html>
+{%- endraw -%}

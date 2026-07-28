@@ -379,7 +379,59 @@ def get_salesperson_wise(from_date=None, to_date=None, company=None, limit=15):
     return {"by_invoice": si_rows, "by_order": so_rows}
 
 
-# ── NEW: Cost Center wise ─────────────────────────────────────────────────────
+# ── NEW: Team (Department) wise ───────────────────────────────────────────────
+
+@frappe.whitelist()
+def get_team_wise(from_date=None, to_date=None, company=None, limit=15):
+    """
+    Department-wise sales — rolled up from Sales Team.sales_person → its
+    Sales Person.department. Same allocated-percentage split as
+    get_salesperson_wise, just grouped one level up.
+    """
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    si_rows = frappe.db.sql(
+        f"""SELECT
+                COALESCE(spr.department, 'No Department') AS department,
+                SUM(si.grand_total * st.allocated_percentage / 100) AS revenue,
+                COUNT(DISTINCT si.name) AS invoices,
+                SUM((si.grand_total - si.outstanding_amount) * st.allocated_percentage / 100) AS collected
+            FROM `tabSales Team` st
+            INNER JOIN `tabSales Invoice` si ON si.name = st.parent
+            LEFT JOIN `tabSales Person` spr ON spr.name = st.sales_person
+            WHERE si.docstatus = 1
+              AND st.parenttype = 'Sales Invoice'
+              AND si.posting_date BETWEEN %s AND %s
+              AND st.sales_person IS NOT NULL
+              {cf}
+            GROUP BY department
+            ORDER BY revenue DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    so_rows = frappe.db.sql(
+        f"""SELECT
+                COALESCE(spr.department, 'No Department') AS department,
+                SUM(so.grand_total * st.allocated_percentage / 100) AS order_value,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Team` st
+            INNER JOIN `tabSales Order` so ON so.name = st.parent
+            LEFT JOIN `tabSales Person` spr ON spr.name = st.sales_person
+            WHERE so.docstatus = 1
+              AND st.parenttype = 'Sales Order'
+              AND so.transaction_date BETWEEN %s AND %s
+              AND st.sales_person IS NOT NULL
+              {cf.replace('si.company', 'so.company')}
+            GROUP BY department
+            ORDER BY order_value DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+
+    return {"by_invoice": si_rows, "by_order": so_rows}
 
 @frappe.whitelist()
 def get_cost_center_wise(from_date=None, to_date=None, company=None, limit=15):
@@ -533,7 +585,8 @@ def check_app_permission():
 def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
                    customer=None, state=None, cost_center=None,
                    sales_person=None, commercial_name=None, uom=None,
-                   naming_series=None, doc_name=None, doc_type=None):
+                   naming_series=None, doc_name=None, doc_type=None,
+                   department=None):
     """
     Single drill-down endpoint for all dashboard tables.
 
@@ -545,6 +598,7 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
       state_customers         → SI+SO: customers in a state
       salesperson_items       → SI: items sold by a sales person
       cost_center_customers   → SI+SO: customers under a cost center
+      team_customers          → SI+SO: customers under a department (team)
       naming_series_docs      → SI: recent docs for a naming series
       transaction_items       → line items for a specific SI or SO document
     """
@@ -785,6 +839,57 @@ def get_drill_down(drill_type, from_date=None, to_date=None, company=None,
         so_map = {r.customer: r for r in so_rows}
         for r in si_rows:
             so = so_map.get(r.customer, {})
+            r["order_value"] = so.get("order_value", 0)
+            r["orders"]      = so.get("orders", 0)
+        return si_rows
+
+    # ── 7b. Team (department) → customers + sales persons ──────────────────────
+    if drill_type == "team_customers":
+        dept_val  = (department or "").strip()
+        dept_like = f"%{dept_val}%"
+        cf_si   = ("AND si.company=%s" if company else "")
+        cf_so2  = ("AND so.company=%s" if company else "")
+
+        si_rows = frappe.db.sql(f"""
+            SELECT
+                si.customer,
+                SUM(si.grand_total * st.allocated_percentage / 100) AS revenue,
+                COUNT(DISTINCT si.name)   AS invoices,
+                MAX(st.sales_person)      AS sales_person
+            FROM `tabSales Team` st
+            JOIN `tabSales Invoice` si ON si.name = st.parent
+            LEFT JOIN `tabSales Person` spr ON spr.name = st.sales_person
+            WHERE si.docstatus = 1
+              AND st.parenttype = 'Sales Invoice'
+              AND si.posting_date BETWEEN %s AND %s
+              AND COALESCE(spr.department, 'No Department') LIKE %s
+              {cf_si}
+            GROUP BY si.customer
+            ORDER BY revenue DESC
+            LIMIT 20
+        """, p_base + [dept_like] + p_co, as_dict=True)
+
+        so_rows = frappe.db.sql(f"""
+            SELECT
+                so.customer,
+                SUM(so.grand_total * st.allocated_percentage / 100) AS order_value,
+                COUNT(DISTINCT so.name) AS orders
+            FROM `tabSales Team` st
+            JOIN `tabSales Order` so ON so.name = st.parent
+            LEFT JOIN `tabSales Person` spr ON spr.name = st.sales_person
+            WHERE so.docstatus = 1
+              AND st.parenttype = 'Sales Order'
+              AND so.transaction_date BETWEEN %s AND %s
+              AND COALESCE(spr.department, 'No Department') LIKE %s
+              {cf_so2}
+            GROUP BY so.customer
+            ORDER BY order_value DESC
+            LIMIT 20
+        """, p_base + [dept_like] + p_co, as_dict=True)
+
+        so_map2 = {r.customer: r for r in so_rows}
+        for r in si_rows:
+            so = so_map2.get(r.customer, {})
             r["order_value"] = so.get("order_value", 0)
             r["orders"]      = so.get("orders", 0)
         return si_rows

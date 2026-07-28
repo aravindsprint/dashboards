@@ -13,12 +13,20 @@ add_to_apps_screen = [
         "name": "dashboards",
         "logo": "/assets/dashboards/images/logo.svg",
         "title": "Dashboards",
-        "route": "/dashboards",
+        "route": "/dashboard-app",
         "has_permission": "dashboards.api.sales_api.check_app_permission",
     }
 ]
 
 website_route_rules = [
+    # New Vue SPA (frontend/, built into dashboards/public/dashboard_app) —
+    # single shell page, client-side routed. This is the pranera_knit-style
+    # app going forward.
+    {"from_route": "/dashboard-app/<path:app_path>", "to_route": "dashboard-app"},
+
+    # Old standalone www pages — left in place so existing bookmarks/links
+    # to /dashboards, /dashboards-sales, /dashboards-inventory keep working
+    # until you're ready to retire them.
     {"from_route": "/dashboards/<path:app_path>", "to_route": "dashboards"},
 ]
 
