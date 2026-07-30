@@ -2,6 +2,8 @@
 
 import frappe
 
+no_cache = 1
+
 def get_context(context):
     # Restrict access to System Manager role only
     if frappe.session.user == "Guest":
