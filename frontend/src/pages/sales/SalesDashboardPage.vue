@@ -74,7 +74,7 @@
               </tr>
             </thead>
             <tbody>
-              <template v-for="(row,i) in sortedRows('ov_cc', ccData.by_invoice, ['revenue','collected','invoices'])" :key="row.cost_center">
+              <template v-for="(row,i) in paged('ov_cc', sortedRows('ov_cc', ccData.by_invoice, ['revenue','collected','invoices']))" :key="row.cost_center">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('ov_cc',row.cost_center)}"
                     @click="toggleDrill('ov_cc', row.cost_center, 'cost_center_customers', {cost_center: row.cost_center})">
                   <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -126,6 +126,9 @@
               <tr v-if="!ccData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
+        </div>
+        <div v-if="remainingCount('ov_cc', sortedRows('ov_cc', ccData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('ov_cc')">Load More — {{ remainingCount('ov_cc', sortedRows('ov_cc', ccData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
         </div>
       </div>
       <div class="sd-slbl mt">Sales Orders</div>
@@ -195,7 +198,7 @@
               <th class="sd-th-r" @click="toggleSort('si_cust','invoices')">Invoices <span :class="['sd-sort',{on:sortIconActive('si_cust','invoices')}]">{{ sortIcon('si_cust','invoices') }}</span></th>
             </tr></thead>
             <tbody>
-              <template v-for="row in sortedRows('si_cust', topCustomers.by_invoice, ['revenue','invoices'])" :key="row.customer">
+              <template v-for="row in paged('si_cust', sortedRows('si_cust', topCustomers.by_invoice, ['revenue','invoices']))" :key="row.customer">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('si_cust',row.customer)}"
                     @click="toggleDrill('si_cust', row.customer, 'customer_items', {customer: row.customer})">
                   <td><strong>{{ row.customer }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('si_cust',row.customer)}">▾</span></td>
@@ -238,6 +241,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('si_cust', sortedRows('si_cust', topCustomers.by_invoice, ['revenue','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('si_cust')">Load More — {{ remainingCount('si_cust', sortedRows('si_cust', topCustomers.by_invoice, ['revenue','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -273,7 +279,7 @@
               <th class="sd-th-r" @click="toggleSort('so_cust','orders')">Orders <span :class="['sd-sort',{on:sortIconActive('so_cust','orders')}]">{{ sortIcon('so_cust','orders') }}</span></th>
             </tr></thead>
             <tbody>
-              <template v-for="row in sortedRows('so_cust', topCustomers.by_order, ['order_value','orders'])" :key="row.customer">
+              <template v-for="row in paged('so_cust', sortedRows('so_cust', topCustomers.by_order, ['order_value','orders']))" :key="row.customer">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('so_cust',row.customer)}"
                     @click="toggleDrill('so_cust', row.customer, 'customer_order_items', {customer: row.customer})">
                   <td><strong>{{ row.customer }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('so_cust',row.customer)}">▾</span></td>
@@ -316,6 +322,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('so_cust', sortedRows('so_cust', topCustomers.by_order, ['order_value','orders'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('so_cust')">Load More — {{ remainingCount('so_cust', sortedRows('so_cust', topCustomers.by_order, ['order_value','orders'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -348,7 +357,7 @@
               <th class="sd-th-r">Qty (SO)</th>
             </tr></thead>
             <tbody>
-              <template v-for="row in sortedRows('cn', commercialName.by_invoice, ['revenue','qty','invoices'])" :key="row.commercial_name">
+              <template v-for="row in paged('cn', sortedRows('cn', commercialName.by_invoice, ['revenue','qty','invoices']))" :key="row.commercial_name">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('cn',row.commercial_name)}"
                     @click="toggleDrill('cn', row.commercial_name, 'commercial_name_detail', {commercial_name: row.commercial_name})">
                   <td><strong>{{ cleanName(row.commercial_name) }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('cn',row.commercial_name)}">▾</span></td>
@@ -392,6 +401,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('cn', sortedRows('cn', commercialName.by_invoice, ['revenue','qty','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('cn')">Load More — {{ remainingCount('cn', sortedRows('cn', commercialName.by_invoice, ['revenue','qty','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -424,7 +436,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="row in sortedRows('uom', uomData.by_invoice, ['revenue','total_qty','invoices'])" :key="row.uom">
+              <template v-for="row in paged('uom', sortedRows('uom', uomData.by_invoice, ['revenue','total_qty','invoices']))" :key="row.uom">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('uom',row.uom)}"
                     @click="toggleDrill('uom', row.uom, 'uom_items', {uom: row.uom})">
                   <td><strong>{{ row.uom || '—' }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('uom',row.uom)}">▾</span></td>
@@ -467,6 +479,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('uom', sortedRows('uom', uomData.by_invoice, ['revenue','total_qty','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('uom')">Load More — {{ remainingCount('uom', sortedRows('uom', uomData.by_invoice, ['revenue','total_qty','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -498,7 +513,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="row in sortedRows('state', stateData.by_invoice, ['revenue','collected','invoices'])" :key="row.state">
+              <template v-for="row in paged('state', sortedRows('state', stateData.by_invoice, ['revenue','collected','invoices']))" :key="row.state">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('state',row.state)}"
                     @click="toggleDrill('state', row.state, 'state_customers', {state: row.state})">
                   <td><strong>{{ row.state || '—' }}</strong> <span class="sd-chevron" :class="{open:isDrillOpen('state',row.state)}">▾</span></td>
@@ -542,6 +557,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('state', sortedRows('state', stateData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('state')">Load More — {{ remainingCount('state', sortedRows('state', stateData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -574,7 +592,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="(row,i) in sortedRows('sp', spData.by_invoice, ['revenue','collected','invoices'])" :key="row.sales_person">
+              <template v-for="(row,i) in paged('sp', sortedRows('sp', spData.by_invoice, ['revenue','collected','invoices']))" :key="row.sales_person">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('sp',row.sales_person)}"
                     @click="toggleDrill('sp', row.sales_person, 'salesperson_items', {sales_person: row.sales_person})">
                   <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -621,6 +639,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('sp', sortedRows('sp', spData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('sp')">Load More — {{ remainingCount('sp', sortedRows('sp', spData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -654,7 +675,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="(row,i) in sortedRows('team', teamData.by_invoice, ['revenue','collected','invoices'])" :key="row.department">
+              <template v-for="(row,i) in paged('team', sortedRows('team', teamData.by_invoice, ['revenue','collected','invoices']))" :key="row.department">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('team',row.department)}"
                     @click="toggleDrill('team', row.department, 'team_customers', {department: row.department})">
                   <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -707,6 +728,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('team', sortedRows('team', teamData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('team')">Load More — {{ remainingCount('team', sortedRows('team', teamData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -740,7 +764,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="(row,i) in sortedRows('cc', ccData.by_invoice, ['revenue','collected','invoices'])" :key="row.cost_center">
+              <template v-for="(row,i) in paged('cc', sortedRows('cc', ccData.by_invoice, ['revenue','collected','invoices']))" :key="row.cost_center">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('cc',row.cost_center)}"
                     @click="toggleDrill('cc', row.cost_center, 'cost_center_customers', {cost_center: row.cost_center})">
                   <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -793,6 +817,9 @@
             </tbody>
           </table>
         </div>
+        <div v-if="remainingCount('cc', sortedRows('cc', ccData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('cc')">Load More — {{ remainingCount('cc', sortedRows('cc', ccData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
+        </div>
       </div>
     </div>
 
@@ -830,7 +857,7 @@
               <th class="sd-th-r">Orders</th>
             </tr></thead>
             <tbody>
-              <template v-for="(row,i) in sortedRows('ns', nsData.by_invoice, ['revenue','collected','invoices'])" :key="row.naming_series">
+              <template v-for="(row,i) in paged('ns', sortedRows('ns', nsData.by_invoice, ['revenue','collected','invoices']))" :key="row.naming_series">
                 <tr class="clickable" :class="{'drill-open':isDrillOpen('ns',row.naming_series)}"
                     @click="toggleDrill('ns', row.naming_series, 'naming_series_docs', {naming_series: row.naming_series})">
                   <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
@@ -875,6 +902,9 @@
               <tr v-if="!nsData.by_invoice.length"><td colspan="8" class="sd-empty">No data available.</td></tr>
             </tbody>
           </table>
+        </div>
+        <div v-if="remainingCount('ns', sortedRows('ns', nsData.by_invoice, ['revenue','collected','invoices'])) > 0" style="text-align:center;padding:14px 0 4px">
+          <button class="sd-xbtn" @click="loadMore('ns')">Load More — {{ remainingCount('ns', sortedRows('ns', nsData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
         </div>
       </div>
     </div>
@@ -1193,15 +1223,15 @@ export default {
           const [s, t, tc, cn, uom, st, sp, team, cc, ns, tx] = await Promise.all([
             call("get_dashboard_summary",    a),
             call("get_monthly_trend",        { months: 6, company: a.company }),
-            call("get_top_customers",        { ...a, limit: 10 }),
-            call("get_commercial_name_wise", { ...a, limit: 15 }),
+            call("get_top_customers",        { ...a, limit: 300 }),
+            call("get_commercial_name_wise", { ...a, limit: 300 }),
             call("get_uom_wise",             a),
-            call("get_state_wise",           { ...a, limit: 15 }),
-            call("get_salesperson_wise",     { ...a, limit: 15 }),
-            call("get_team_wise",            { ...a, limit: 15 }),
-            call("get_cost_center_wise",     { ...a, limit: 15 }),
-            call("get_naming_series_wise",   { ...a, limit: 20 }),
-            call("get_recent_transactions",  { limit: 50, company: a.company }),
+            call("get_state_wise",           { ...a, limit: 300 }),
+            call("get_salesperson_wise",     { ...a, limit: 300 }),
+            call("get_team_wise",            { ...a, limit: 100 }),
+            call("get_cost_center_wise",     { ...a, limit: 100 }),
+            call("get_naming_series_wise",   { ...a, limit: 100 }),
+            call("get_recent_transactions",  { limit: 300, company: a.company }),
           ]);
           const EMPTY_BI = { by_invoice: [], by_order: [] };
           summary.value        = s   || { invoice: { total_invoiced:0, total_collected:0, total_outstanding:0, collection_rate:0, count:0, status_breakdown:{} }, order: { total_ordered:0, count:0, status_breakdown:{}, delivery_breakdown:{} } };
@@ -1437,6 +1467,23 @@ export default {
       const tableSort  = ref({});
       const filterText = ref({});
 
+      /* ── "Load More" pagination (client-side, over already-fetched rows) */
+      const PAGE_SIZE = 15;
+      const PAGE_STEP = 25;
+      const pageSize  = ref({});
+
+      function paged(tableKey, rows) {
+        const n = pageSize.value[tableKey] || PAGE_SIZE;
+        return rows.slice(0, n);
+      }
+      function loadMore(tableKey) {
+        pageSize.value[tableKey] = (pageSize.value[tableKey] || PAGE_SIZE) + PAGE_STEP;
+      }
+      function remainingCount(tableKey, rows) {
+        const shown = pageSize.value[tableKey] || PAGE_SIZE;
+        return Math.max(0, rows.length - shown);
+      }
+
       function getSort(tableKey) {
         return tableSort.value[tableKey] || { col: null, dir: "asc" };
       }
@@ -1554,6 +1601,7 @@ export default {
         summary, trend, topCustomers,
         drill, drillCache, isDrillOpen, getDrillRows, isDrillLoading, toggleDrill, expandAll, collapseAll,
         tableSort, filterText, getSort, toggleSort, sortedRows, sortIcon, sortIconActive,
+        paged, loadMore, remainingCount,
         commercialName, uomData, stateData, spData, teamData, ccData, nsData, transactions,
         filteredTransactions,
         fmt, fmtQty, fmtDate, pct, txLink, cleanName,
