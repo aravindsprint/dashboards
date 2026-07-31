@@ -10,12 +10,14 @@
   <link rel="icon" type="image/svg+xml" href="/assets/dashboards/images/favicon.svg"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Inventory Dashboard — Pranera ERP</title>
-  <link rel="manifest" href="/manifest.json"/>
   <meta name="theme-color" content="#0097A7"/>
   <meta name="mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-title" content="Inventory Dashboard"/>
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.4/dist/jspdf.plugin.autotable.min.js"></script>
   <style>
 :root{
   --b:#1565C0;--t:#0097A7;--g:#2E7D32;--a:#F57C00;--r:#C62828;--m:#757575;
@@ -84,19 +86,26 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
 .sd-badge.reject{background:#FFEBEE;color:#C62828}
 .sd-badge.other{background:#F3E5F5;color:#6A1B9A}
 .sd-empty{padding:40px;text-align:center;color:var(--m)}
+.sd-filter-row th{padding:4px 6px;background:#fff;border-bottom:1px solid var(--br)}
+.sd-colf{width:100%;font-size:11px;padding:4px 6px;border:1px solid var(--br);border-radius:5px;outline:none;font-weight:400;text-transform:none;box-sizing:border-box}
+.sd-colf:focus{border-color:var(--t)}
+.sd-colf-r{text-align:right}
   </style>
 </head>
 <body>
 <div id="app">
+<div id="app">
 
   <div class="sd-header">
     <div class="sd-header__left">
-      <a class="sd-back" href="/dashboards">&larr; Dashboards</a>
+      <a class="sd-back" href="/dashboard-app">&larr; Dashboards</a>
       <div class="sd-title">📦 Inventory Dashboard</div>
     </div>
     <div class="sd-header__right">
       <button class="sd-btn" @click="expandAll">Expand All Rows</button>
       <button class="sd-btn" @click="collapseAll">Collapse All Rows</button>
+      <button class="sd-btn" @click="exportExcel">⬇ Excel</button>
+      <button class="sd-btn" @click="exportPdf">⬇ PDF</button>
       <button class="sd-btn primary" @click="loadActiveTab(true)">⟳ Refresh</button>
     </div>
   </div>
@@ -139,6 +148,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
                 <th v-if="activeTab==='mars200'">Collar Status</th>
                 <th v-if="activeTab==='mars200'" class="sd-th-r">Cuff Qty</th>
                 <th v-if="activeTab==='mars200'">Cuff Status</th>
+              </tr>
+              <tr class="sd-filter-row">
+                <th><input class="sd-colf" v-model="colFilters.name_color" placeholder="Filter…"/></th>
+                <th><input class="sd-colf" v-model="colFilters.width" placeholder="Filter…"/></th>
+                <th v-if="activeTab!=='mars200'"><input class="sd-colf" v-model="colFilters.item_code" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf" v-model="colFilters.batch_no" placeholder="Filter…"/></th>
+                <th v-else><input class="sd-colf" v-model="colFilters.warehouse" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf" v-model="colFilters.parentwarehouse" placeholder="Filter…"/></th>
+                <th><input class="sd-colf sd-colf-r" v-model="colFilters.qty" placeholder="Filter…"/></th>
+                <th v-if="activeTab!=='mars200'"><input class="sd-colf" v-model="colFilters.batch_no" placeholder="Filter…"/></th>
+                <th><input class="sd-colf" v-model="colFilters.batch_status" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf sd-colf-r" v-model="colFilters.collar_qty" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf" v-model="colFilters.collar_status" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf sd-colf-r" v-model="colFilters.cuff_qty" placeholder="Filter…"/></th>
+                <th v-if="activeTab==='mars200'"><input class="sd-colf" v-model="colFilters.cuff_status" placeholder="Filter…"/></th>
               </tr>
             </thead>
             <tbody>
@@ -192,8 +216,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;f
   </div>
 
 </div>
+</div>
 
 <script>
+/* Inventory Dashboard — Vue 3, self-contained www page (CDN builds of XLSX/jsPDF/autoTable) */
 const { createApp } = Vue;
 
 /* API: works in both Desk (/app/...) and www/PWA contexts, same approach
@@ -229,6 +255,7 @@ function callApi(method, args) {
     });
 }
 
+
 createApp({
   data(){
     return {
@@ -244,17 +271,42 @@ createApp({
       error: { mars200: '', pt_sastri: '', jv: '' },
       expanded: new Set(),
       search: '',
+      colFilters: {
+        name_color: '', width: '', item_code: '', warehouse: '', batch_no: '',
+        qty: '', batch_status: '', parentwarehouse: '',
+        collar_qty: '', collar_status: '', cuff_qty: '', cuff_status: '',
+      },
     }
   },
   computed: {
     currentRows(){ return this.rows[this.activeTab] || []; },
     filteredRows(){
       const q = this.search.trim().toLowerCase();
-      if(!q) return this.currentRows;
-      return this.currentRows.filter(r => {
-        return ['commercial_name','color','width','item_code','warehouse','parentwarehouse','batch_no','batch_status']
-          .some(f => (r[f] || '').toString().toLowerCase().includes(q));
-      });
+      let rows = this.currentRows;
+      if(q){
+        rows = rows.filter(r => {
+          return ['commercial_name','color','width','item_code','warehouse','parentwarehouse','batch_no','batch_status']
+            .some(f => (r[f] || '').toString().toLowerCase().includes(q));
+        });
+      }
+      const cf = this.colFilters;
+      const has = (v) => v !== null && v !== undefined && String(v).trim() !== '';
+      const matches = (val, filterVal) => (val || '').toString().toLowerCase().includes(filterVal.trim().toLowerCase());
+
+      if(has(cf.name_color)) rows = rows.filter(r => matches(r.commercial_name, cf.name_color) || matches(r.color, cf.name_color));
+      if(has(cf.width))            rows = rows.filter(r => matches(r.width, cf.width));
+      if(has(cf.item_code))        rows = rows.filter(r => matches(r.item_code, cf.item_code));
+      if(has(cf.warehouse))        rows = rows.filter(r => matches(r.warehouse, cf.warehouse));
+      if(has(cf.batch_no))         rows = rows.filter(r => matches(r.batch_no, cf.batch_no));
+      if(has(cf.batch_status))     rows = rows.filter(r => matches(r.batch_status, cf.batch_status));
+      if(has(cf.parentwarehouse))  rows = rows.filter(r => matches(r.parentwarehouse, cf.parentwarehouse));
+      if(has(cf.collar_status))    rows = rows.filter(r => matches(r.collar_status, cf.collar_status));
+      if(has(cf.cuff_status))      rows = rows.filter(r => matches(r.cuff_status, cf.cuff_status));
+      if(has(cf.qty))              rows = rows.filter(r => matches(this.fmt(r.actual_qty), cf.qty));
+      if(has(cf.collar_qty))       rows = rows.filter(r => matches(this.fmt(r.collar_qty), cf.collar_qty));
+      if(has(cf.cuff_qty))         rows = rows.filter(r => matches(this.fmt(r.cuff_qty), cf.cuff_qty));
+
+      return rows;
     },
     tree(){
       // group by commercial_name -> color
@@ -329,6 +381,7 @@ createApp({
     switchTab(key){
       this.activeTab = key;
       this.search = '';
+      for(const k in this.colFilters) this.colFilters[k] = '';
       this.expanded.clear();
       if(!this.loaded[key]) this.loadActiveTab(false);
     },
@@ -354,11 +407,68 @@ createApp({
         this.loading[tab] = false;
       }
     },
+
+    // ── Export: both operate on filteredRows — i.e. whatever's currently
+    // visible after the search box + column filters, not the full unfiltered set.
+    _exportRows(){
+      const isMars = this.activeTab === 'mars200';
+      return this.filteredRows.map(r => {
+        const base = {
+          'Commercial Name': r.commercial_name || '',
+          'Color': r.color || '',
+          'Width': r.width || '',
+        };
+        if(!isMars) base['Item Code'] = r.item_code || '';
+        if(isMars) base['Batch No'] = r.batch_no || '';
+        base[isMars ? 'Warehouse Group' : 'Warehouse'] = isMars ? r.parentwarehouse : r.warehouse;
+        base['Qty'] = +r.actual_qty || 0;
+        if(!isMars) base['Batch No'] = r.batch_no || '';
+        base['Batch Status'] = r.batch_status || '';
+        if(isMars){
+          base['Collar Qty'] = +r.collar_qty || 0;
+          base['Collar Status'] = r.collar_status || '';
+          base['Cuff Qty'] = +r.cuff_qty || 0;
+          base['Cuff Status'] = r.cuff_status || '';
+        }
+        return base;
+      });
+    },
+    _exportFilename(ext){
+      const tabLabel = (this.tabs.find(t=>t.key===this.activeTab) || {}).label || this.activeTab;
+      const stamp = new Date().toISOString().slice(0,10);
+      return `inventory-${tabLabel.toLowerCase().replace(/[^a-z0-9]+/g,'-')}-${stamp}.${ext}`;
+    },
+    exportExcel(){
+      const rows = this._exportRows();
+      if(!rows.length){ alert('No rows to export — adjust your filters.'); return; }
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, (this.tabs.find(t=>t.key===this.activeTab)||{}).label || 'Sheet1');
+      XLSX.writeFile(wb, this._exportFilename('xlsx'));
+    },
+    exportPdf(){
+      const rows = this._exportRows();
+      if(!rows.length){ alert('No rows to export — adjust your filters.'); return; }
+      const headers = Object.keys(rows[0]);
+      const body = rows.map(r => headers.map(h => r[h]));
+      const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      doc.setFontSize(12);
+      doc.text(`Inventory Dashboard — ${(this.tabs.find(t=>t.key===this.activeTab)||{}).label || this.activeTab}`, 24, 28);
+      doc.autoTable({
+        head: [headers],
+        body,
+        startY: 40,
+        styles: { fontSize: 7, cellPadding: 3 },
+        headStyles: { fillColor: [21, 101, 192] },
+      });
+      doc.save(this._exportFilename('pdf'));
+    },
   },
   mounted(){
     this.loadActiveTab(false);
   }
 }).mount('#app');
+
 </script>
 </body>
 </html>
