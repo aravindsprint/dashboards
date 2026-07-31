@@ -10,6 +10,28 @@ CACHE_KEY_CONFIG = "wa_dashboard_config"
 CACHE_KEY_LOG    = "wa_dashboard_log"
 
 
+def _require_system_manager():
+    """
+    Every whitelisted endpoint in this file touches WhatsApp API credentials
+    or can trigger a real send — @frappe.whitelist() alone only requires a
+    logged-in (non-Guest) session, not any particular role, so each of these
+    needs its own explicit check. Mirrors the guard in www/whatsapp-config.py.
+
+    Only enforced when there's an actual HTTP request in flight. This same
+    function is also called internally by run_scheduled_whatsapp() (the cron
+    job) via plain Python calls to get_summary_for_whatsapp()/
+    send_whatsapp_report() — there's no frappe.request in that context, and
+    it must not be blocked just because the scheduler's job user isn't
+    System Manager.
+    """
+    if not frappe.request:
+        return
+    if frappe.session.user == "Guest":
+        frappe.throw(frappe._("Please login to access this resource."), frappe.PermissionError)
+    if "System Manager" not in frappe.get_roles(frappe.session.user):
+        frappe.throw(frappe._("System Manager role required."), frappe.PermissionError)
+
+
 # ── Storage (Redis cache) ─────────────────────────────────────────────────────
 
 def _config_path():
@@ -62,11 +84,13 @@ def _set_cache(key, value):
 
 @frappe.whitelist()
 def get_config():
+    _require_system_manager()
     return _get_cache(CACHE_KEY_CONFIG, {})
 
 
 @frappe.whitelist()
 def save_config(config=None):
+    _require_system_manager()
     try:
         if isinstance(config, str):
             config = json.loads(config)
@@ -80,6 +104,7 @@ def save_config(config=None):
 
 @frappe.whitelist()
 def get_send_log():
+    _require_system_manager()
     logs = _get_cache(CACHE_KEY_LOG, [])
     return sorted(logs, key=lambda x: x.get("time", ""), reverse=True)[:50]
 
@@ -104,6 +129,7 @@ def _fmt(v):
 
 @frappe.whitelist()
 def get_summary_for_whatsapp(days=30, company=None):
+    _require_system_manager()
     # Default to primary company if not specified
     if not company:
         company = frappe.defaults.get_global_default("company") or None
@@ -383,6 +409,7 @@ def _send_single(phone, summary, cfg):
 
 @frappe.whitelist()
 def send_whatsapp_report(recipients=None, summary=None, config=None, trigger="manual"):
+    _require_system_manager()
     try:
         if isinstance(recipients, str): recipients = json.loads(recipients)
         if isinstance(summary, str):    summary    = json.loads(summary)
@@ -488,6 +515,7 @@ def run_scheduled_whatsapp():
 
 @frappe.whitelist()
 def test_whatsapp_connection():
+    _require_system_manager()
     cfg      = _get_cache(CACHE_KEY_CONFIG, {})
     token    = cfg.get("token", "")
     phone_id = cfg.get("phoneId", "")
@@ -521,6 +549,7 @@ def direct_send(phone, token, phone_id, template_name, days=30,
                 language_code="en", api_version="v22.0",
                 message_footer="Pranera ERP - Auto Report", company=None):
     """Send directly without relying on saved config. Useful for testing."""
+    _require_system_manager()
     cfg = {
         "token":         token,
         "phoneId":       phone_id,
