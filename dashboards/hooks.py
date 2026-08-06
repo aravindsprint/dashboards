@@ -40,3 +40,20 @@ scheduler_events = {
         "dashboards.api.whatsapp_api.run_scheduled_whatsapp",
     ],
 }
+
+# Bust the inventory dashboard's cache the moment stock actually changes,
+# rather than letting it serve stale batch/warehouse quantities for up to
+# CACHE_TTL. Stock Ledger Entry covers Stock Entry, Delivery Note, Purchase
+# Receipt, Stock Reconciliation, Serial and Batch Bundle moves, etc. Repost
+# Item Valuation is covered separately since it can rewrite qty_after_transaction
+# via a background job without necessarily re-triggering SLE doc events.
+doc_events = {
+    "Stock Ledger Entry": {
+        "on_update": "dashboards.api.inventory_api.clear_cache",
+        "on_cancel": "dashboards.api.inventory_api.clear_cache",
+        "on_trash": "dashboards.api.inventory_api.clear_cache",
+    },
+    "Repost Item Valuation": {
+        "on_update": "dashboards.api.inventory_api.clear_cache",
+    },
+}
