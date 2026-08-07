@@ -33,54 +33,73 @@ def _rows_for_warehouse_group(wh_like):
     """
     Batch-wise available stock (qty > 0) for every fabric item sitting in
     warehouses matching wh_like, e.g. 'JV/%' or 'PT/SASTRI%'.
-    Mirrors the old stockapp getStockDetailsForAllBatches(JV) queries, but
-    reads live from ERPNext's own Stock Ledger Entry / Batch / Item tables
-    instead of a mirrored sqlite cache.
 
-    IMPORTANT: this takes each (item, warehouse, batch)'s qty_after_transaction
-    from its most recent non-cancelled SLE, NOT SUM(actual_qty). Summing
-    actual_qty assumes every SLE ever posted for that combination is still
-    perfectly consistent — but backdated entries, corrections, or a batch
-    still awaiting "Repost Item Valuation" can leave that sum out of step
-    with reality (e.g. showing qty in a warehouse the batch has actually
-    been fully moved out of). qty_after_transaction on the latest entry is
-    what ERPNext's own Bin / Stock Balance report treats as the live
-    balance, so we mirror that here instead.
+    Frappe v15 tracks batches two different ways depending on when/how the
+    stock movement was recorded:
+      1. Legacy entries: `Stock Ledger Entry.batch_no` is set directly and
+         `serial_and_batch_bundle` is empty. Older transactions.
+      2. Bundle entries: the SLE points at a `Serial and Batch Bundle`, whose
+         per-batch quantities live in the `Serial and Batch Entry` child
+         table — `sle.batch_no` itself is NOT populated for these.
+    A batch's real ledger history is very often split across both — e.g.
+    received via a legacy entry, later moved out via a bundle-based one.
+    Reading only one source (as earlier versions of this query did) misses
+    half the movement and shows phantom stock in warehouses the batch has
+    actually left. This query unions both sources — legacy rows that have
+    NO bundle link, plus all bundle rows — so nothing is double-counted and
+    nothing is missed. Verified field-for-field against ERPNext's own Batch
+    document "Stock Levels" widget for batch 23PTIN0547/DT-9960 (every
+    warehouse reconciled exactly, including warehouses that net to zero and
+    correctly drop out).
     """
     return frappe.db.sql(
         """
-        WITH latest_sle AS (
+        SELECT
+            x.item_code                    AS item_code,
+            item.commercial_name           AS commercial_name,
+            item.color                     AS color,
+            item.width                     AS width,
+            x.warehouse                    AS warehouse,
+            x.batch_no                     AS batch_no,
+            batch.batch_status             AS batch_status,
+            ROUND(SUM(x.qty), 3)           AS actual_qty,
+            MAX(x.stock_uom)               AS stock_uom
+        FROM (
+            -- bundle-based entries (Serial and Batch Bundle)
             SELECT
-                sle.item_code,
-                sle.warehouse,
-                sle.batch_no,
-                sle.qty_after_transaction,
-                sle.stock_uom,
-                ROW_NUMBER() OVER (
-                    PARTITION BY sle.item_code, sle.warehouse, sle.batch_no
-                    ORDER BY sle.posting_date DESC, sle.posting_time DESC, sle.creation DESC
-                ) AS rn
+                sbb.item_code AS item_code,
+                sbb.warehouse AS warehouse,
+                sbe.batch_no  AS batch_no,
+                sbe.qty       AS qty,
+                sle.stock_uom AS stock_uom
+            FROM `tabSerial and Batch Entry` sbe
+            INNER JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
+            INNER JOIN `tabStock Ledger Entry` sle
+                    ON sle.serial_and_batch_bundle = sbb.name AND sle.is_cancelled = 0
+            WHERE sbb.docstatus = 1 AND sbb.is_cancelled = 0
+              AND sbb.warehouse LIKE %(wh_like)s
+              AND sbe.batch_no IS NOT NULL AND sbe.batch_no != ''
+
+            UNION ALL
+
+            -- legacy entries with no bundle link at all
+            SELECT
+                sle.item_code AS item_code,
+                sle.warehouse AS warehouse,
+                sle.batch_no  AS batch_no,
+                sle.actual_qty AS qty,
+                sle.stock_uom AS stock_uom
             FROM `tabStock Ledger Entry` sle
             WHERE sle.is_cancelled = 0
+              AND (sle.serial_and_batch_bundle IS NULL OR sle.serial_and_batch_bundle = '')
               AND sle.warehouse LIKE %(wh_like)s
               AND sle.batch_no IS NOT NULL AND sle.batch_no != ''
-        )
-        SELECT
-            ls.item_code                        AS item_code,
-            item.commercial_name                AS commercial_name,
-            item.color                          AS color,
-            item.width                          AS width,
-            ls.warehouse                        AS warehouse,
-            ls.batch_no                         AS batch_no,
-            batch.batch_status                  AS batch_status,
-            ROUND(ls.qty_after_transaction, 3)  AS actual_qty,
-            ls.stock_uom                        AS stock_uom
-        FROM latest_sle ls
-        INNER JOIN `tabItem` item   ON item.item_code = ls.item_code
-        INNER JOIN `tabBatch` batch ON batch.name = ls.batch_no
-        WHERE ls.rn = 1
-          AND item.commercial_name IS NOT NULL AND item.commercial_name != ''
-          AND ls.qty_after_transaction > 0
+        ) x
+        INNER JOIN `tabItem` item   ON item.item_code = x.item_code
+        INNER JOIN `tabBatch` batch ON batch.name = x.batch_no
+        WHERE item.commercial_name IS NOT NULL AND item.commercial_name != ''
+        GROUP BY x.item_code, x.warehouse, x.batch_no
+        HAVING actual_qty > 0
         ORDER BY item.commercial_name, item.color, item.width
         """,
         {"wh_like": wh_like},
@@ -136,45 +155,52 @@ def get_mars200_stock(commercial_name="MARS 200", refresh=0):
         if cached is not None:
             return cached
 
-    # Same fix as _rows_for_warehouse_group: use each (item, warehouse, batch)'s
-    # latest qty_after_transaction rather than SUM(actual_qty), so this reflects
-    # live stock even when a batch is mid-repost or has backdated corrections.
+    # Same fix as _rows_for_warehouse_group: union legacy sle.batch_no entries
+    # (no bundle) with Serial and Batch Bundle entries, instead of reading
+    # sle.batch_no alone — see that function's docstring for why.
     fabric_rows = frappe.db.sql(
         """
-        WITH latest_sle AS (
+        SELECT
+            x.batch_no                              AS batch_no,
+            item.commercial_name                    AS commercial_name,
+            item.color                               AS color,
+            item.width                               AS width,
+            batch.batch_status                       AS batch_status,
+            CASE WHEN x.warehouse LIKE 'JV/%%' THEN 'JV' ELSE 'SASTRI' END AS parentwarehouse,
+            ROUND(SUM(x.qty), 3)                     AS actual_qty,
+            MAX(x.stock_uom)                         AS stock_uom
+        FROM (
             SELECT
-                sle.batch_no,
-                sle.item_code,
-                sle.warehouse,
-                sle.qty_after_transaction,
-                sle.stock_uom,
-                CASE WHEN sle.warehouse LIKE 'JV/%%' THEN 'JV' ELSE 'SASTRI' END AS parentwarehouse,
-                ROW_NUMBER() OVER (
-                    PARTITION BY sle.item_code, sle.warehouse, sle.batch_no
-                    ORDER BY sle.posting_date DESC, sle.posting_time DESC, sle.creation DESC
-                ) AS rn
+                sbb.item_code AS item_code, sbb.warehouse AS warehouse,
+                sbe.batch_no AS batch_no, sbe.qty AS qty, sle.stock_uom AS stock_uom
+            FROM `tabSerial and Batch Entry` sbe
+            INNER JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
+            INNER JOIN `tabStock Ledger Entry` sle
+                    ON sle.serial_and_batch_bundle = sbb.name AND sle.is_cancelled = 0
+            INNER JOIN `tabItem` item ON item.item_code = sbb.item_code
+            WHERE sbb.docstatus = 1 AND sbb.is_cancelled = 0
+              AND item.custom_item_type = 'Fabric'
+              AND item.commercial_name LIKE %(comm)s
+              AND (sbb.warehouse LIKE 'JV/%%' OR sbb.warehouse LIKE 'PT/SASTRI%%')
+              AND sbe.batch_no IS NOT NULL AND sbe.batch_no != ''
+
+            UNION ALL
+
+            SELECT
+                sle.item_code AS item_code, sle.warehouse AS warehouse,
+                sle.batch_no AS batch_no, sle.actual_qty AS qty, sle.stock_uom AS stock_uom
             FROM `tabStock Ledger Entry` sle
             INNER JOIN `tabItem` item ON item.item_code = sle.item_code
             WHERE sle.is_cancelled = 0
+              AND (sle.serial_and_batch_bundle IS NULL OR sle.serial_and_batch_bundle = '')
               AND item.custom_item_type = 'Fabric'
               AND item.commercial_name LIKE %(comm)s
               AND (sle.warehouse LIKE 'JV/%%' OR sle.warehouse LIKE 'PT/SASTRI%%')
               AND sle.batch_no IS NOT NULL AND sle.batch_no != ''
-        )
-        SELECT
-            ls.batch_no                         AS batch_no,
-            item.commercial_name                AS commercial_name,
-            item.color                          AS color,
-            item.width                          AS width,
-            batch.batch_status                  AS batch_status,
-            ls.parentwarehouse                  AS parentwarehouse,
-            ROUND(SUM(ls.qty_after_transaction), 3) AS actual_qty,
-            ls.stock_uom                        AS stock_uom
-        FROM latest_sle ls
-        INNER JOIN `tabItem` item   ON item.item_code = ls.item_code
-        INNER JOIN `tabBatch` batch ON batch.name = ls.batch_no
-        WHERE ls.rn = 1
-        GROUP BY ls.batch_no, ls.parentwarehouse
+        ) x
+        INNER JOIN `tabItem` item   ON item.item_code = x.item_code
+        INNER JOIN `tabBatch` batch ON batch.name = x.batch_no
+        GROUP BY x.batch_no, parentwarehouse
         HAVING actual_qty > 0
         ORDER BY item.color, item.width
         """,
@@ -187,31 +213,33 @@ def get_mars200_stock(commercial_name="MARS 200", refresh=0):
     if batch_nos:
         cc_rows = frappe.db.sql(
             """
-            WITH latest_sle AS (
-                SELECT
-                    sle.item_code,
-                    sle.warehouse,
-                    sle.batch_no,
-                    sle.qty_after_transaction,
-                    ROW_NUMBER() OVER (
-                        PARTITION BY sle.item_code, sle.warehouse, sle.batch_no
-                        ORDER BY sle.posting_date DESC, sle.posting_time DESC, sle.creation DESC
-                    ) AS rn
+            SELECT
+                batch.custom_parent_batch AS parent_batch,
+                item.custom_item_type     AS item_type,
+                batch.batch_status        AS batch_status,
+                ROUND(SUM(x.qty), 3)      AS qty
+            FROM (
+                SELECT sbe.batch_no AS batch_no, sbe.qty AS qty
+                FROM `tabSerial and Batch Entry` sbe
+                INNER JOIN `tabSerial and Batch Bundle` sbb ON sbb.name = sbe.parent
+                INNER JOIN `tabStock Ledger Entry` sle
+                        ON sle.serial_and_batch_bundle = sbb.name AND sle.is_cancelled = 0
+                INNER JOIN `tabItem` item ON item.item_code = sbb.item_code
+                WHERE sbb.docstatus = 1 AND sbb.is_cancelled = 0
+                  AND item.custom_item_type IN ('Collar', 'Cuff')
+
+                UNION ALL
+
+                SELECT sle.batch_no AS batch_no, sle.actual_qty AS qty
                 FROM `tabStock Ledger Entry` sle
                 INNER JOIN `tabItem` item ON item.item_code = sle.item_code
                 WHERE sle.is_cancelled = 0
+                  AND (sle.serial_and_batch_bundle IS NULL OR sle.serial_and_batch_bundle = '')
                   AND item.custom_item_type IN ('Collar', 'Cuff')
-            )
-            SELECT
-                batch.custom_parent_batch          AS parent_batch,
-                item.custom_item_type               AS item_type,
-                batch.batch_status                  AS batch_status,
-                ROUND(SUM(ls.qty_after_transaction), 3) AS qty
-            FROM latest_sle ls
-            INNER JOIN `tabBatch` batch ON batch.name = ls.batch_no
-            INNER JOIN `tabItem` item   ON item.item_code = ls.item_code
-            WHERE ls.rn = 1
-              AND batch.custom_parent_batch IN %(batch_nos)s
+            ) x
+            INNER JOIN `tabBatch` batch ON batch.name = x.batch_no
+            INNER JOIN `tabItem` item   ON item.item_code = batch.item
+            WHERE batch.custom_parent_batch IN %(batch_nos)s
             GROUP BY batch.custom_parent_batch, item.custom_item_type, batch.batch_status
             HAVING qty > 0
             """,

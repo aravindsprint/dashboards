@@ -44,11 +44,18 @@ scheduler_events = {
 # Bust the inventory dashboard's cache the moment stock actually changes,
 # rather than letting it serve stale batch/warehouse quantities for up to
 # CACHE_TTL. Stock Ledger Entry covers Stock Entry, Delivery Note, Purchase
-# Receipt, Stock Reconciliation, Serial and Batch Bundle moves, etc. Repost
-# Item Valuation is covered separately since it can rewrite qty_after_transaction
-# via a background job without necessarily re-triggering SLE doc events.
+# Receipt, Stock Reconciliation, etc. Serial and Batch Bundle is covered
+# separately since the batch-wise query reads its child entries directly —
+# an SLE update doesn't always fire when only the bundle doc itself changes
+# (e.g. submission/cancellation timing). Repost Item Valuation is covered
+# too since it can rewrite ledger balances via a background job.
 doc_events = {
     "Stock Ledger Entry": {
+        "on_update": "dashboards.api.inventory_api.clear_cache",
+        "on_cancel": "dashboards.api.inventory_api.clear_cache",
+        "on_trash": "dashboards.api.inventory_api.clear_cache",
+    },
+    "Serial and Batch Bundle": {
         "on_update": "dashboards.api.inventory_api.clear_cache",
         "on_cancel": "dashboards.api.inventory_api.clear_cache",
         "on_trash": "dashboards.api.inventory_api.clear_cache",
