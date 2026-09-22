@@ -4,6 +4,7 @@ import { isLoggedIn } from '@/api/frappe'
 import HubPage from '@/pages/hub/HubPage.vue'
 import SalesDashboardPage from '@/pages/sales/SalesDashboardPage.vue'
 import InventoryDashboardPage from '@/pages/inventory/InventoryDashboardPage.vue'
+import KnittingDashboardPage from '@/pages/knitting/KnittingDashboardPage.vue'
 import LoginPage from '@/pages/login/LoginPage.vue'
 
 const routes = [
@@ -12,6 +13,7 @@ const routes = [
   { path: '/dashboard-app', component: HubPage },
   { path: '/dashboard-app/sales', component: SalesDashboardPage },
   { path: '/dashboard-app/inventory', component: InventoryDashboardPage },
+  { path: '/dashboard-app/knitting', component: KnittingDashboardPage },
 ]
 
 const router = createRouter({

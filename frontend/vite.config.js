@@ -11,18 +11,29 @@ export default defineConfig(({ command }) => ({
 
   server: {
     port: 3000,
+    // Bound to a dedicated hostname (not "localhost") on purpose: the proxy
+    // below rewrites the erp.pranera.in session cookie's Domain so it can
+    // land on this dev server. If that rewrite target were bare "localhost",
+    // the cookie would also be sent to any other local Frappe bench running
+    // on localhost (e.g. a local dev site on :8001) — cookies are scoped by
+    // domain only, never by port — and the two sessions would stomp on each
+    // other, logging one or the other out on every refresh. Add this once:
+    //   sudo sh -c 'echo "127.0.0.1 dashboards.local" >> /etc/hosts'
+    // then browse to http://dashboards.local:3000/dashboard-app/inventory
+    // instead of localhost:3000.
+    host: 'dashboards.local',
     // Dev-server only — vite build never reads this (production always talks
     // to erp.pranera.in directly since it's served from that same origin).
     // Same proxy setup as pranera_knit/frontend/vite.config.js: needed so
-    // `npm run dev` (localhost:3000) can reach the live backend; without it
-    // every /api/* call 404s against Vite's own dev server.
+    // `npm run dev` can reach the live backend; without it every /api/* call
+    // 404s against Vite's own dev server.
     proxy: command === 'serve' ? {
       '/api': {
         target: 'https://erp.pranera.in',
         changeOrigin: true,
         secure: false,
         ws: true,
-        cookieDomainRewrite: 'localhost',
+        cookieDomainRewrite: 'dashboards.local',
         headers: {
           'Origin': 'https://erp.pranera.in',
           'Referer': 'https://erp.pranera.in'

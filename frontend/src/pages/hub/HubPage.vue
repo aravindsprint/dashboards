@@ -24,13 +24,13 @@
         <span class="tag tag-live">● Live</span>
       </router-link>
 
-      <div class="card coming">
+      <router-link to="/dashboard-app/knitting" class="card">
         <div class="accent" style="background:#F57C00"></div>
-        <div class="icon">🛒</div>
-        <div class="card-title">Purchase Dashboard</div>
-        <div class="card-desc">Purchase Orders &amp; Purchase Invoices — supplier-wise spend, pending GRNs, payment aging.</div>
-        <span class="tag tag-soon">Coming soon</span>
-      </div>
+        <div class="icon">🧶</div>
+        <div class="card-title">Knitting Dashboard</div>
+        <div class="card-desc">Knitting production — job cards, rolls produced, operator-wise output, machine efficiency.</div>
+        <span class="tag tag-live">● Live</span>
+      </router-link>
 
       <div class="card coming">
         <div class="accent" style="background:#2E7D32"></div>
@@ -62,6 +62,14 @@
         <div class="card-title">Quality Dashboard</div>
         <div class="card-desc">Quality Inspections — rejection rate, defect category, supplier quality trends.</div>
         <span class="tag tag-plan">Planned</span>
+      </div>
+
+      <div class="card coming">
+        <div class="accent" style="background:#F57C00"></div>
+        <div class="icon">🛒</div>
+        <div class="card-title">Purchase Dashboard</div>
+        <div class="card-desc">Purchase Orders &amp; Purchase Invoices — supplier-wise spend, pending GRNs, payment aging.</div>
+        <span class="tag tag-soon">Coming soon</span>
       </div>
 
     </div>
