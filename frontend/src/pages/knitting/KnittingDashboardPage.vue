@@ -17,10 +17,7 @@
       <div class="kd-fg"><label class="kd-lbl">From</label><input type="date" v-model="filters.from_date" class="kd-input" @change="loadAll"/></div>
       <div class="kd-fg"><label class="kd-lbl">To</label><input type="date" v-model="filters.to_date" class="kd-input" @change="loadAll"/></div>
       <div class="kd-fg"><label class="kd-lbl">Company</label>
-        <select v-model="filters.company" class="kd-select" @change="loadAll">
-          <option value="">All companies</option>
-          <option v-for="c in companies" :key="c" :value="c">{{ c }}</option>
-        </select>
+        <div class="kd-company-fixed">{{ COMPANY }}</div>
       </div>
       <div class="kd-ranges">
         <button v-for="r in quickRanges" :key="r.label" :class="['kd-range',{active:activeRange===r.label}]" @click="applyRange(r)">{{ r.label }}</button>
@@ -58,162 +55,51 @@
     </div>
 
     <div class="kd-section-title">Item-wise breakdown</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="itemRows.length">
-        <thead>
-          <tr>
-            <th>Item code</th>
-            <th>Commercial name</th>
-            <th>Color</th>
-            <th>Type</th>
-            <th class="num">Qty</th>
-            <th>UOM</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in itemRows" :key="r.item_code">
-            <td>{{ r.item_code }}</td>
-            <td>{{ r.commercial_name || '—' }}</td>
-            <td>{{ r.color || '—' }}</td>
-            <td>{{ r.item_type }}</td>
-            <td class="num">{{ fmtQty(r.qty) }}</td>
-            <td>{{ r.uom }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No fabric, collar or cuff movement in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="itemColumns" :rows="itemRows" :empty-text="loaded ? 'No fabric, collar or cuff movement in this date range.' : 'Loading…'" />
 
   </div>
 
   <!-- Fabrics: production volume of all fabrics knitted (Roll doctype) -->
   <div v-show="activeTab==='fabrics'" class="kd-body">
     <div class="kd-section-title">Fabric production volume</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="fabricRows.length">
-        <thead>
-          <tr><th>Fabric</th><th>Item code</th><th class="num">Rolls</th><th class="num">Weight (Kgs)</th><th class="num">Pieces</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in fabricRows" :key="r.item_code">
-            <td>{{ r.fabric || '—' }}</td>
-            <td>{{ r.item_code }}</td>
-            <td class="num">{{ r.rolls }}</td>
-            <td class="num">{{ fmtQty(r.total_weight) }}</td>
-            <td class="num">{{ fmtQty(r.total_qty) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No rolls in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="fabricColumns" :rows="fabricRows" :empty-text="loaded ? 'No rolls in this date range.' : 'Loading…'" />
   </div>
 
   <!-- Operators: skill level based on correct vs mistake qty (Roll doctype) -->
   <div v-show="activeTab==='operators'" class="kd-body">
     <div class="kd-section-title">Operator skill assessment</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="operatorRows.length">
-        <thead>
-          <tr><th>Operator</th><th class="num">Rolls</th><th class="num">Weight (Kgs)</th><th class="num">Correct pcs</th><th class="num">Mistake pcs</th><th class="num">Accuracy</th><th>Skill level</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in operatorRows" :key="r.operator">
-            <td>{{ r.operator }}</td>
-            <td class="num">{{ r.rolls }}</td>
-            <td class="num">{{ fmtQty(r.total_weight) }}</td>
-            <td class="num">{{ fmtQty(r.correct_qty) }}</td>
-            <td class="num">{{ fmtQty(r.mistake_qty) }}</td>
-            <td class="num">{{ r.accuracy_pct }}%</td>
-            <td><span :class="['kd-skill', skillClass(r.skill_level)]">{{ r.skill_level }}</span></td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No operator-logged rolls in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="operatorColumns" :rows="operatorRows" :empty-text="loaded ? 'No operator-logged rolls in this date range.' : 'Loading…'">
+      <template #cell-skill_level="{ value }">
+        <span :class="['kd-skill', skillClass(value)]">{{ value }}</span>
+      </template>
+    </KdTable>
   </div>
 
   <!-- Machines: output per knitting machine (Roll doctype) -->
   <div v-show="activeTab==='machines'" class="kd-body">
     <div class="kd-section-title">Machine output</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="machineRows.length">
-        <thead>
-          <tr><th>Machine</th><th class="num">Rolls</th><th class="num">Weight (Kgs)</th><th class="num">Pieces</th><th class="num">Efficiency</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in machineRows" :key="r.machine">
-            <td>{{ r.machine }}</td>
-            <td class="num">{{ r.rolls }}</td>
-            <td class="num">{{ fmtQty(r.total_weight) }}</td>
-            <td class="num">{{ fmtQty(r.total_qty) }}</td>
-            <td class="num">{{ r.efficiency_pct }}%</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No machine-logged rolls in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="machineColumns" :rows="machineRows" :empty-text="loaded ? 'No machine-logged rolls in this date range.' : 'Loading…'" />
   </div>
 
   <!-- Monthly: total production by month (Roll doctype) -->
   <div v-show="activeTab==='monthly'" class="kd-body">
     <div class="kd-section-title">Monthly total production</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="monthlyRows.length">
-        <thead>
-          <tr><th>Month</th><th class="num">Rolls</th><th class="num">Weight (Kgs)</th><th class="num">Pieces</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in monthlyRows" :key="r.month">
-            <td>{{ r.month }}</td>
-            <td class="num">{{ r.rolls }}</td>
-            <td class="num">{{ fmtQty(r.total_weight) }}</td>
-            <td class="num">{{ fmtQty(r.total_qty) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No rolls in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="monthlyColumns" :rows="monthlyRows" :totals="monthlyTotals" :empty-text="loaded ? 'No rolls in this date range.' : 'Loading…'" />
   </div>
 
   <!-- Daily: Fabric (Kgs) / Collar / Cuffs (Pcs) per date, with grand totals -->
   <div v-show="activeTab==='daily'" class="kd-body">
     <div class="kd-section-title">Daily production — Body Fabric / Collar / Cuffs</div>
-    <div class="kd-table-wrap">
-      <table class="kd-table" v-if="dailyRows.length">
-        <thead>
-          <tr class="kd-total-row">
-            <td>Total prod</td>
-            <td class="num">{{ fmtQty(dailyTotals.fabric_qty) }}</td>
-            <td class="num">{{ fmtQty(dailyTotals.collar_qty) }}</td>
-            <td class="num">{{ fmtQty(dailyTotals.cuff_qty) }}</td>
-          </tr>
-          <tr><th>Date</th><th class="num">Body Fabric (Kgs)</th><th class="num">Collar (Pcs)</th><th class="num">Cuffs (Pcs)</th></tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in dailyRows" :key="r.date">
-            <td>{{ fmtDateLabel(r.date) }}</td>
-            <td class="num">{{ fmtQty(r.fabric_qty) }}</td>
-            <td class="num">{{ fmtQty(r.collar_qty) }}</td>
-            <td class="num">{{ fmtQty(r.cuff_qty) }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-else-if="loaded" class="kd-placeholder">No fabric, collar or cuff movement in this date range.</div>
-      <div v-else class="kd-placeholder">Loading…</div>
-    </div>
+    <KdTable :columns="dailyColumns" :rows="dailyRows" :totals="dailyTotalsRow" :empty-text="loaded ? 'No fabric, collar or cuff movement in this date range.' : 'Loading…'" />
   </div>
 
 </div>
 </template>
 
 <script>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { call, todayStr } from '@/api/frappe'
+import KdTable from '@/components/knitting/KdTable.vue'
 
 /* ── date helpers (same as the Sales Dashboard) ───────────────── */
 function fmtDate(d) {
@@ -237,11 +123,14 @@ function startOfFiscalYear(s) {
 
 export default {
   name: 'KnittingDashboardPage',
+  components: { KdTable },
   setup() {
     const today = todayStr()
-    const DEFAULT_COMPANY = 'Pranera Services & Solutions'
+    // Locked to this one company — no dropdown, matches every other tile on
+    // the Overview screenshot you sent ("Pranera Services and Solutions Pvt. Ltd.,").
+    const COMPANY = 'Pranera Services and Solutions Pvt. Ltd.,'
 
-    const filters = ref({ from_date: today, to_date: today, company: '' })
+    const filters = ref({ from_date: today, to_date: today, company: COMPANY })
     const activeRange = ref('Today')
     const quickRanges = [
       { label: 'Today',      fn: (t) => ({ from: t,                     to: t }) },
@@ -258,7 +147,6 @@ export default {
       { label: 'Fiscal Yr',  fn: (t) => ({ from: startOfFiscalYear(t),  to: t }) },
     ]
 
-    const companies = ref([])
     const tabs = [
       { key: 'overview',  label: 'Overview',  icon: '📊' },
       { key: 'fabrics',   label: 'Fabrics',   icon: '🧵' },
@@ -310,6 +198,70 @@ export default {
       return `${day}-${mon}`
     }
 
+    // ── column definitions for each table (KdTable handles sort + per-column filter) ──
+    const itemColumns = [
+      { key: 'item_code',       label: 'Item code' },
+      { key: 'commercial_name', label: 'Commercial name' },
+      { key: 'color',           label: 'Color' },
+      { key: 'item_type',       label: 'Type' },
+      { key: 'qty',             label: 'Qty', numeric: true, format: fmtQty },
+      { key: 'uom',             label: 'UOM' },
+    ]
+    const fabricColumns = [
+      { key: 'fabric',       label: 'Fabric' },
+      { key: 'item_code',    label: 'Item code' },
+      { key: 'rolls',        label: 'Rolls',        numeric: true },
+      { key: 'total_weight', label: 'Weight (Kgs)', numeric: true, format: fmtQty },
+      { key: 'total_qty',    label: 'Pieces',       numeric: true, format: fmtQty },
+    ]
+    const operatorColumns = [
+      { key: 'operator',      label: 'Operator' },
+      { key: 'rolls',         label: 'Rolls',        numeric: true },
+      { key: 'total_weight',  label: 'Weight (Kgs)', numeric: true, format: fmtQty },
+      { key: 'correct_qty',   label: 'Correct pcs',  numeric: true, format: fmtQty },
+      { key: 'mistake_qty',   label: 'Mistake pcs',  numeric: true, format: fmtQty },
+      { key: 'accuracy_pct',  label: 'Accuracy',     numeric: true, suffix: '%' },
+      { key: 'skill_level',   label: 'Skill level' },
+    ]
+    const machineColumns = [
+      { key: 'machine',        label: 'Machine' },
+      { key: 'rolls',          label: 'Rolls',        numeric: true },
+      { key: 'total_weight',   label: 'Weight (Kgs)', numeric: true, format: fmtQty },
+      { key: 'total_qty',      label: 'Pieces',       numeric: true, format: fmtQty },
+      { key: 'efficiency_pct', label: 'Efficiency',   numeric: true, suffix: '%' },
+    ]
+    const monthlyColumns = [
+      { key: 'month',        label: 'Month' },
+      { key: 'rolls',        label: 'Rolls',        numeric: true },
+      { key: 'total_weight', label: 'Weight (Kgs)', numeric: true, format: fmtQty },
+      { key: 'total_qty',    label: 'Pieces',       numeric: true, format: fmtQty },
+    ]
+    const dailyColumns = [
+      { key: 'date',       label: 'Date',                numeric: false, format: fmtDateLabel },
+      { key: 'fabric_qty', label: 'Body Fabric (Kgs)',    numeric: true,  format: fmtQty },
+      { key: 'collar_qty', label: 'Collar (Pcs)',         numeric: true,  format: fmtQty },
+      { key: 'cuff_qty',   label: 'Cuffs (Pcs)',          numeric: true,  format: fmtQty },
+    ]
+
+    // Totals rows — computed from the full dataset (unaffected by the
+    // in-table column filters), matching how the Daily tab already worked.
+    const monthlyTotals = computed(() => {
+      if (!monthlyRows.value.length) return null
+      const t = { label: 'Total prod', rolls: 0, total_weight: 0, total_qty: 0 }
+      for (const r of monthlyRows.value) {
+        t.rolls += Number(r.rolls) || 0
+        t.total_weight += Number(r.total_weight) || 0
+        t.total_qty += Number(r.total_qty) || 0
+      }
+      return t
+    })
+    const dailyTotalsRow = computed(() => ({
+      label: 'Total prod',
+      fabric_qty: dailyTotals.value.fabric_qty,
+      collar_qty: dailyTotals.value.collar_qty,
+      cuff_qty: dailyTotals.value.cuff_qty,
+    }))
+
     async function loadAll() {
       loaded.value = false
       const args = {
@@ -342,29 +294,15 @@ export default {
       }
     }
 
-    function _normalizeCompany(s) {
-      return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-    }
-
-    async function loadFilterOptions() {
-      try {
-        const o = await call('dashboards.api.knitting_api.get_filter_options', {})
-        companies.value = o.companies || []
-        const wanted = _normalizeCompany(DEFAULT_COMPANY)
-        const match = companies.value.find((c) => _normalizeCompany(c).includes(wanted))
-        if (match) filters.value.company = match
-        else if (companies.value.length) filters.value.company = companies.value[0]
-      } catch (e) { console.warn('Filter options failed:', e) }
-      await loadAll()
-    }
-
-    onMounted(loadFilterOptions)
+    onMounted(loadAll)
 
     return {
-      filters, activeRange, quickRanges, companies, tabs, activeTab,
+      filters, activeRange, quickRanges, COMPANY, tabs, activeTab,
       applyRange, loadAll, summary, itemRows, fabricRows, operatorRows,
       machineRows, monthlyRows, dailyRows, dailyTotals, loaded, fmtQty,
       fmtDateLabel, skillClass,
+      itemColumns, fabricColumns, operatorColumns, machineColumns,
+      monthlyColumns, dailyColumns, monthlyTotals, dailyTotalsRow,
     }
   },
 }
@@ -391,6 +329,7 @@ export default {
 .kd-lbl{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:var(--m)}
 .kd-input,.kd-select{font-size:12px;padding:5px 9px;border:1px solid var(--br);border-radius:6px;background:#fff;color:var(--tx);outline:none}
 .kd-input:focus,.kd-select:focus{border-color:var(--b)}
+.kd-company-fixed{font-size:12px;padding:5px 9px;border:1px solid var(--br);border-radius:6px;background:#F8FAFB;color:var(--tx);white-space:nowrap}
 .kd-ranges{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
 .kd-range{padding:4px 9px;font-size:11px;border:1px solid var(--br);border-radius:6px;background:#fff;cursor:pointer;color:var(--m);transition:.15s all}
 .kd-range:hover,.kd-range.active{background:var(--b);border-color:var(--b);color:#fff}
@@ -416,19 +355,9 @@ export default {
 .kd-card-uom{font-size:13px;font-weight:500;color:var(--m)}
 .kd-card-sub{font-size:12px;color:var(--m);margin-top:4px}
 
-.kd-table-wrap{background:#fff;border:1px solid var(--br);border-radius:10px;overflow-x:auto}
-.kd-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.kd-table th{text-align:left;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--m);padding:10px 14px;border-bottom:1px solid var(--br);white-space:nowrap}
-.kd-table td{padding:9px 14px;border-bottom:1px solid #F0F0F0;color:var(--tx);white-space:nowrap}
-.kd-table tr:last-child td{border-bottom:none}
-.kd-table th.num,.kd-table td.num{text-align:right}
-.kd-table-wrap .kd-placeholder{border:none;border-radius:0}
-
 .kd-skill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:11px;font-weight:700}
 .kd-skill-excellent{background:#E1F5EE;color:#085041}
 .kd-skill-good{background:#EAF3DE;color:#27500A}
 .kd-skill-average{background:#FAEEDA;color:#854F0B}
 .kd-skill-review{background:#FCEBEB;color:#791F1F}
-
-.kd-total-row td{background:#FFF7E0;font-weight:700;color:#1A1A1A;padding:9px 14px;border-bottom:1px solid var(--br)}
 </style>
