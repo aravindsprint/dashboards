@@ -732,6 +732,47 @@
           <button class="sd-xbtn" @click="loadMore('team')">Load More — {{ remainingCount('team', sortedRows('team', teamData.by_invoice, ['revenue','collected','invoices'])) }} more rows</button>
         </div>
       </div>
+
+      <!-- Team-wise Kgs (Fabric + Collar + Cuff) -->
+      <div class="sd-card" style="margin-top:16px">
+        <div class="sd-ch">
+          <span class="sd-ct">Team-wise Kgs</span>
+          <span style="font-size:11px;color:#9E9E9E">Pcs = Collar + Cuff pieces · Kgs = Fabric (Kgs) + Collar (Pcs × 0.034) + Cuff (Pcs × 0.013) · Sales Invoice</span>
+        </div>
+        <div class="sd-toolbar">
+          <input v-model="filterText['teamkgs']" class="sd-search" placeholder="Filter teams…"/>
+        </div>
+        <div class="sd-twrap">
+          <table class="sd-table">
+            <thead><tr>
+              <th>S.No</th>
+              <th @click="toggleSort('teamkgs','department')">Team Name <span :class="['sd-sort',{on:sortIconActive('teamkgs','department')}]">{{ sortIcon('teamkgs','department') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','pcs')">Pcs <span :class="['sd-sort',{on:sortIconActive('teamkgs','pcs')}]">{{ sortIcon('teamkgs','pcs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','kgs')">Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','kgs')}]">{{ sortIcon('teamkgs','kgs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','amount')">Amount <span :class="['sd-sort',{on:sortIconActive('teamkgs','amount')}]">{{ sortIcon('teamkgs','amount') }}</span></th>
+            </tr></thead>
+            <tbody>
+              <tr v-for="(row,i) in sortedRows('teamkgs', teamKgsData, ['pcs','kgs','amount'])" :key="row.department">
+                <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
+                <td><strong>{{ row.department || 'No Department' }}</strong></td>
+                <td class="sd-amt" :title="`Collar ${fmtPcs(row.collar_pcs)} · Cuff ${fmtPcs(row.cuff_pcs)}`">{{ fmtPcs(row.pcs) }}</td>
+                <td class="sd-amt" :title="`Fabric ${fmtKg(row.fabric_kgs)} · Collar ${fmtKg(row.collar_kgs)} · Cuff ${fmtKg(row.cuff_kgs)}`">{{ fmtKg(row.kgs) }}</td>
+                <td class="sd-amt">{{ fmt(row.amount) }}</td>
+              </tr>
+              <tr v-if="!teamKgsData.length"><td colspan="5" class="sd-empty">No data available.</td></tr>
+            </tbody>
+            <tfoot v-if="teamKgsData.length">
+              <tr style="border-top:2px solid #E0E0E0;font-weight:700">
+                <td></td>
+                <td>Total</td>
+                <td class="sd-amt">{{ fmtPcs(teamKgsTotal.pcs) }}</td>
+                <td class="sd-amt">{{ fmtKg(teamKgsTotal.kgs) }}</td>
+                <td class="sd-amt">{{ fmt(teamKgsTotal.amount) }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
     </div>
 
     <!-- ═══════════════ COST CENTER ═══════════════ -->
@@ -1160,6 +1201,11 @@ export default {
       const stateData      = ref({ by_invoice: [], by_order: [] });
       const spData         = ref({ by_invoice: [], by_order: [] });
       const teamData       = ref({ by_invoice: [], by_order: [] });
+      const teamKgsData    = ref([]);
+      const teamKgsTotal   = computed(() => teamKgsData.value.reduce(
+        (t, r) => ({ pcs: t.pcs + (parseFloat(r.pcs) || 0), kgs: t.kgs + (parseFloat(r.kgs) || 0), amount: t.amount + (parseFloat(r.amount) || 0) }),
+        { pcs: 0, kgs: 0, amount: 0 }
+      ));
       const ccData         = ref({ by_invoice: [], by_order: [] });
       const nsData         = ref({ by_invoice: [], by_order: [] });
       const transactions   = ref([]);
@@ -1184,6 +1230,14 @@ export default {
         if (n >= 1e5) return (n / 1e5).toFixed(1) + "L";
         if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
         return Math.round(n).toLocaleString();
+      }
+      function fmtPcs(v) {
+        const n = parseFloat(v) || 0;
+        return n ? Math.round(n).toLocaleString("en-IN") : "—";
+      }
+      function fmtKg(v) {
+        const n = parseFloat(v) || 0;
+        return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + " kg";
       }
       function fmtDate(d) {
         if (!d) return "—";
@@ -1220,7 +1274,7 @@ export default {
           company:   filters.value.company,
         };
         try {
-          const [s, t, tc, cn, uom, st, sp, team, cc, ns, tx] = await Promise.all([
+          const [s, t, tc, cn, uom, st, sp, team, cc, ns, tx, teamKgs] = await Promise.all([
             call("get_dashboard_summary",    a),
             call("get_monthly_trend",        { months: 6, company: a.company }),
             call("get_top_customers",        { ...a, limit: 300 }),
@@ -1232,6 +1286,7 @@ export default {
             call("get_cost_center_wise",     { ...a, limit: 100 }),
             call("get_naming_series_wise",   { ...a, limit: 100 }),
             call("get_recent_transactions",  { limit: 300, company: a.company }),
+            call("get_team_kgs_wise",        { ...a, limit: 100 }),
           ]);
           const EMPTY_BI = { by_invoice: [], by_order: [] };
           summary.value        = s   || { invoice: { total_invoiced:0, total_collected:0, total_outstanding:0, collection_rate:0, count:0, status_breakdown:{} }, order: { total_ordered:0, count:0, status_breakdown:{}, delivery_breakdown:{} } };
@@ -1245,6 +1300,9 @@ export default {
           if (safeTeam.by_invoice) safeTeam.by_invoice.forEach(r => { r.department = (r.department || '').replace(/ - PSS$/i, '').trim(); });
           if (safeTeam.by_order)   safeTeam.by_order.forEach(r =>   { r.department = (r.department || '').replace(/ - PSS$/i, '').trim(); });
           teamData.value        = safeTeam;
+          teamKgsData.value     = (Array.isArray(teamKgs) ? teamKgs : []).map(r => ({
+            ...r, department: (r.department || '').replace(/ - PSS$/i, '').trim(),
+          }));
           const safeCc = cc || { ...EMPTY_BI };
           if (safeCc.by_invoice) safeCc.by_invoice.forEach(r => { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
           if (safeCc.by_order)   safeCc.by_order.forEach(r =>   { r.cost_center = (r.cost_center || '').replace(/ - PSS$/i, '').trim(); });
@@ -1602,9 +1660,9 @@ export default {
         drill, drillCache, isDrillOpen, getDrillRows, isDrillLoading, toggleDrill, expandAll, collapseAll,
         tableSort, filterText, getSort, toggleSort, sortedRows, sortIcon, sortIconActive,
         paged, loadMore, remainingCount,
-        commercialName, uomData, stateData, spData, teamData, ccData, nsData, transactions,
+        commercialName, uomData, stateData, spData, teamData, teamKgsData, teamKgsTotal, ccData, nsData, transactions,
         filteredTransactions,
-        fmt, fmtQty, fmtDate, pct, txLink, cleanName,
+        fmt, fmtQty, fmtKg, fmtPcs, fmtDate, pct, txLink, cleanName,
         applyRange, loadAll,
         siColor, soColor, delColor,
       };

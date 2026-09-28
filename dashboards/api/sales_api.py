@@ -433,6 +433,87 @@ def get_team_wise(from_date=None, to_date=None, company=None, limit=15):
 
     return {"by_invoice": si_rows, "by_order": so_rows}
 
+# ── NEW: Team (Department) wise — Kgs ─────────────────────────────────────────
+
+# Pcs → Kgs conversion for flat-knit trims (kg per piece)
+COLLAR_KG_PER_PC = 0.034
+CUFF_KG_PER_PC   = 0.013
+
+
+@frappe.whitelist()
+def get_team_kgs_wise(from_date=None, to_date=None, company=None, limit=15):
+    """
+    Department-wise Kgs + Amount from Sales Invoice Items (fabric, collar, cuff).
+
+      • UOM Kgs                → qty as-is
+      • UOM Pcs + Collar item  → qty × COLLAR_KG_PER_PC
+      • UOM Pcs + Cuff item    → qty × CUFF_KG_PER_PC
+      • anything else (garments, dyes, chemicals, swatch cards…) is excluded
+
+    Collar / Cuff is decided by item_group first, then item_name (CUFF checked
+    before COLLAR, since some cuff items are named "...Collar (VANTAGE PLUS CUFF)").
+    Split across sales persons by Sales Team.allocated_percentage, same as
+    get_team_wise. Amount = item amount (before tax).
+    """
+    from_date, to_date = _date_args(from_date, to_date)
+    cf = _cf(company)
+    p  = [from_date, to_date] + ([company] if company else [])
+
+    rows = frappe.db.sql(
+        f"""SELECT
+                x.department,
+                SUM(x.kgs    * x.alloc) AS kgs,
+                SUM(x.amount * x.alloc) AS amount,
+                SUM(CASE WHEN x.uom = 'Pcs' THEN x.qty * x.alloc ELSE 0 END) AS pcs,
+                SUM(CASE WHEN x.uom = 'Pcs' AND x.cat = 'collar' THEN x.qty * x.alloc ELSE 0 END) AS collar_pcs,
+                SUM(CASE WHEN x.uom = 'Pcs' AND x.cat = 'cuff'   THEN x.qty * x.alloc ELSE 0 END) AS cuff_pcs,
+                SUM(CASE WHEN x.cat = 'fabric' THEN x.kgs * x.alloc ELSE 0 END) AS fabric_kgs,
+                SUM(CASE WHEN x.cat = 'collar' THEN x.kgs * x.alloc ELSE 0 END) AS collar_kgs,
+                SUM(CASE WHEN x.cat = 'cuff'   THEN x.kgs * x.alloc ELSE 0 END) AS cuff_kgs
+            FROM (
+                SELECT
+                    y.department, y.alloc, y.amount, y.cat, y.uom, y.qty,
+                    CASE
+                        WHEN y.uom = 'Kgs'                      THEN y.qty
+                        WHEN y.uom = 'Pcs' AND y.cat = 'collar' THEN y.qty * {COLLAR_KG_PER_PC}
+                        WHEN y.uom = 'Pcs' AND y.cat = 'cuff'   THEN y.qty * {CUFF_KG_PER_PC}
+                        ELSE 0
+                    END AS kgs
+                FROM (
+                    SELECT
+                        COALESCE(spr.department, 'No Department') AS department,
+                        st.allocated_percentage / 100 AS alloc,
+                        sii.amount, sii.qty, sii.uom,
+                        CASE
+                            WHEN sii.item_group LIKE '%%CUFF%%'   THEN 'cuff'
+                            WHEN sii.item_group LIKE '%%COLLAR%%' THEN 'collar'
+                            WHEN sii.item_name  LIKE '%%CUFF%%'   THEN 'cuff'
+                            WHEN sii.item_name  LIKE '%%COLLAR%%' THEN 'collar'
+                            ELSE 'fabric'
+                        END AS cat
+                    FROM `tabSales Team` st
+                    INNER JOIN `tabSales Invoice` si       ON si.name = st.parent
+                    INNER JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+                    LEFT JOIN `tabSales Person` spr        ON spr.name = st.sales_person
+                    WHERE si.docstatus = 1
+                      AND st.parenttype = 'Sales Invoice'
+                      AND si.posting_date BETWEEN %s AND %s
+                      AND st.sales_person IS NOT NULL
+                      AND (sii.item_group LIKE 'FABRIC%%'
+                           OR sii.item_name LIKE '%%COLLAR%%'
+                           OR sii.item_name LIKE '%%CUFF%%')
+                      {cf}
+                ) y
+                WHERE y.uom = 'Kgs' OR (y.uom = 'Pcs' AND y.cat IN ('collar', 'cuff'))
+            ) x
+            GROUP BY x.department
+            ORDER BY kgs DESC
+            LIMIT {int(limit)}""",
+        p, as_dict=True,
+    )
+    return rows
+
+
 @frappe.whitelist()
 def get_cost_center_wise(from_date=None, to_date=None, company=None, limit=15):
     """
