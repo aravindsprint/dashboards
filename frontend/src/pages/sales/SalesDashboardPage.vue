@@ -737,7 +737,7 @@
       <div class="sd-card" style="margin-top:16px">
         <div class="sd-ch">
           <span class="sd-ct">Team-wise Kgs</span>
-          <span style="font-size:11px;color:#9E9E9E">Pcs = Collar + Cuff pieces · Kgs = Fabric (Kgs) + Collar (Pcs × 0.034) + Cuff (Pcs × 0.013) · Sales Invoice</span>
+          <span style="font-size:11px;color:#9E9E9E">Total Pcs = Collar + Cuff pieces · Total Kgs = Fabric Kgs + Collar (Pcs × 0.034) + Cuff (Pcs × 0.013) · Sales Invoice</span>
         </div>
         <div class="sd-toolbar">
           <input v-model="filterText['teamkgs']" class="sd-search" placeholder="Filter teams…"/>
@@ -747,25 +747,40 @@
             <thead><tr>
               <th>S.No</th>
               <th @click="toggleSort('teamkgs','department')">Team Name <span :class="['sd-sort',{on:sortIconActive('teamkgs','department')}]">{{ sortIcon('teamkgs','department') }}</span></th>
-              <th class="sd-th-r" @click="toggleSort('teamkgs','pcs')">Pcs <span :class="['sd-sort',{on:sortIconActive('teamkgs','pcs')}]">{{ sortIcon('teamkgs','pcs') }}</span></th>
-              <th class="sd-th-r" @click="toggleSort('teamkgs','kgs')">Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','kgs')}]">{{ sortIcon('teamkgs','kgs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','collar_pcs')">Collar Pcs <span :class="['sd-sort',{on:sortIconActive('teamkgs','collar_pcs')}]">{{ sortIcon('teamkgs','collar_pcs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','cuff_pcs')">Cuff Pcs <span :class="['sd-sort',{on:sortIconActive('teamkgs','cuff_pcs')}]">{{ sortIcon('teamkgs','cuff_pcs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','pcs')">Total Pcs <span :class="['sd-sort',{on:sortIconActive('teamkgs','pcs')}]">{{ sortIcon('teamkgs','pcs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','fabric_kgs')">Fabric Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','fabric_kgs')}]">{{ sortIcon('teamkgs','fabric_kgs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','collar_kgs')">Collar Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','collar_kgs')}]">{{ sortIcon('teamkgs','collar_kgs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','cuff_kgs')">Cuff Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','cuff_kgs')}]">{{ sortIcon('teamkgs','cuff_kgs') }}</span></th>
+              <th class="sd-th-r" @click="toggleSort('teamkgs','kgs')">Total Kgs <span :class="['sd-sort',{on:sortIconActive('teamkgs','kgs')}]">{{ sortIcon('teamkgs','kgs') }}</span></th>
               <th class="sd-th-r" @click="toggleSort('teamkgs','amount')">Amount <span :class="['sd-sort',{on:sortIconActive('teamkgs','amount')}]">{{ sortIcon('teamkgs','amount') }}</span></th>
             </tr></thead>
             <tbody>
-              <tr v-for="(row,i) in sortedRows('teamkgs', teamKgsData, ['pcs','kgs','amount'])" :key="row.department">
+              <tr v-for="(row,i) in sortedRows('teamkgs', teamKgsData, ['collar_pcs','cuff_pcs','pcs','fabric_kgs','collar_kgs','cuff_kgs','kgs','amount'])" :key="row.department">
                 <td style="color:#9E9E9E;font-size:12px">{{ i+1 }}</td>
                 <td><strong>{{ row.department || 'No Department' }}</strong></td>
-                <td class="sd-amt" :title="`Collar ${fmtPcs(row.collar_pcs)} · Cuff ${fmtPcs(row.cuff_pcs)}`">{{ fmtPcs(row.pcs) }}</td>
-                <td class="sd-amt" :title="`Fabric ${fmtKg(row.fabric_kgs)} · Collar ${fmtKg(row.collar_kgs)} · Cuff ${fmtKg(row.cuff_kgs)}`">{{ fmtKg(row.kgs) }}</td>
+                <td class="sd-amt">{{ fmtPcs(row.collar_pcs) }}</td>
+                <td class="sd-amt">{{ fmtPcs(row.cuff_pcs) }}</td>
+                <td class="sd-amt"><strong>{{ fmtPcs(row.pcs) }}</strong></td>
+                <td class="sd-amt">{{ fmtKgDash(row.fabric_kgs) }}</td>
+                <td class="sd-amt" :title="`${fmtPcs(row.collar_pcs)} pcs × 0.034`">{{ fmtKgDash(row.collar_kgs) }}</td>
+                <td class="sd-amt" :title="`${fmtPcs(row.cuff_pcs)} pcs × 0.013`">{{ fmtKgDash(row.cuff_kgs) }}</td>
+                <td class="sd-amt"><strong>{{ fmtKg(row.kgs) }}</strong></td>
                 <td class="sd-amt">{{ fmt(row.amount) }}</td>
               </tr>
-              <tr v-if="!teamKgsData.length"><td colspan="5" class="sd-empty">No data available.</td></tr>
+              <tr v-if="!teamKgsData.length"><td colspan="10" class="sd-empty">No data available.</td></tr>
             </tbody>
             <tfoot v-if="teamKgsData.length">
               <tr style="border-top:2px solid #E0E0E0;font-weight:700">
                 <td></td>
                 <td>Total</td>
+                <td class="sd-amt">{{ fmtPcs(teamKgsTotal.collar_pcs) }}</td>
+                <td class="sd-amt">{{ fmtPcs(teamKgsTotal.cuff_pcs) }}</td>
                 <td class="sd-amt">{{ fmtPcs(teamKgsTotal.pcs) }}</td>
+                <td class="sd-amt">{{ fmtKgDash(teamKgsTotal.fabric_kgs) }}</td>
+                <td class="sd-amt">{{ fmtKgDash(teamKgsTotal.collar_kgs) }}</td>
+                <td class="sd-amt">{{ fmtKgDash(teamKgsTotal.cuff_kgs) }}</td>
                 <td class="sd-amt">{{ fmtKg(teamKgsTotal.kgs) }}</td>
                 <td class="sd-amt">{{ fmt(teamKgsTotal.amount) }}</td>
               </tr>
@@ -1203,8 +1218,8 @@ export default {
       const teamData       = ref({ by_invoice: [], by_order: [] });
       const teamKgsData    = ref([]);
       const teamKgsTotal   = computed(() => teamKgsData.value.reduce(
-        (t, r) => ({ pcs: t.pcs + (parseFloat(r.pcs) || 0), kgs: t.kgs + (parseFloat(r.kgs) || 0), amount: t.amount + (parseFloat(r.amount) || 0) }),
-        { pcs: 0, kgs: 0, amount: 0 }
+        (t, r) => ({ collar_pcs: t.collar_pcs + (parseFloat(r.collar_pcs) || 0), cuff_pcs: t.cuff_pcs + (parseFloat(r.cuff_pcs) || 0), pcs: t.pcs + (parseFloat(r.pcs) || 0), fabric_kgs: t.fabric_kgs + (parseFloat(r.fabric_kgs) || 0), collar_kgs: t.collar_kgs + (parseFloat(r.collar_kgs) || 0), cuff_kgs: t.cuff_kgs + (parseFloat(r.cuff_kgs) || 0), kgs: t.kgs + (parseFloat(r.kgs) || 0), amount: t.amount + (parseFloat(r.amount) || 0) }),
+        { collar_pcs: 0, cuff_pcs: 0, pcs: 0, fabric_kgs: 0, collar_kgs: 0, cuff_kgs: 0, kgs: 0, amount: 0 }
       ));
       const ccData         = ref({ by_invoice: [], by_order: [] });
       const nsData         = ref({ by_invoice: [], by_order: [] });
@@ -1234,6 +1249,9 @@ export default {
       function fmtPcs(v) {
         const n = parseFloat(v) || 0;
         return n ? Math.round(n).toLocaleString("en-IN") : "—";
+      }
+      function fmtKgDash(v) {
+        return (parseFloat(v) || 0) ? fmtKg(v) : "—";
       }
       function fmtKg(v) {
         const n = parseFloat(v) || 0;
@@ -1662,7 +1680,7 @@ export default {
         paged, loadMore, remainingCount,
         commercialName, uomData, stateData, spData, teamData, teamKgsData, teamKgsTotal, ccData, nsData, transactions,
         filteredTransactions,
-        fmt, fmtQty, fmtKg, fmtPcs, fmtDate, pct, txLink, cleanName,
+        fmt, fmtQty, fmtKg, fmtKgDash, fmtPcs, fmtDate, pct, txLink, cleanName,
         applyRange, loadAll,
         siColor, soColor, delColor,
       };
